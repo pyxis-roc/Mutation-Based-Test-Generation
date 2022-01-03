@@ -73,7 +73,7 @@ def run_single_insn(insn, ptxc_pm, path_to_ptx_semantics, path_to_MUSIC, path_to
     insn_file_copy_path = f"{insn}_copy.c"
     insn_file = open(insn_file_copy_path, "w+")
     copy(oracle_program_path, insn_file_copy_path)
-    insn_pm = ProgramManipulator(f"{insn}_copy.c", path_to_fakeheaders)
+    insn_pm = ProgramManipulator(f"{insn}_copy.c", path_to_fakeheaders, other_headers=[f"-I{path_to_ptx_semantics}/c"])
     execute_insn_func = ptxc_pm.get_function(function_name)
     updated_insn_program = insn_pm.add_function_to_program(execute_insn_func, add_header="ptxc_utils.h")
 
@@ -107,8 +107,27 @@ class Worker(threading.Thread):
             run_single_insn(*work)
             self.q.task_done()
 
+def hc_insn_list():
+    return ["abs_f32"]
 
-def runner(path_to_MUSIC, path_to_fakeheaders, use_yaml=True):
+def file_insn_list(listf):
+    with open(listf, "r") as f:
+        t = [x.strip() for x in f.readlines()]
+        t = [tt for tt in t if (tt != '' and tt[0] != '#')]  # remove empty lines and comments
+
+    return t
+
+def find_insn_list(path_to_ptx_semantics, total=100):
+    all_insns = subprocess.check_output(f" find {path_to_ptx_semantics}/c -type f -print0 | xargs -0 basename -a", shell=True)
+    all_insns_arr = str(all_insns).split('\\n')
+    # for f32
+    insn_list = [insn for insn in all_insns_arr if insn.endswith("f32")]
+    if total is not None:
+        insn_list = insn_list[:total]
+
+    return insn_list
+
+def runner(path_to_MUSIC, path_to_fakeheaders, insn_list, use_yaml=True):
 
    # idea; start by only looking at tests of f32 type:
    # command to get all of them: find . -maxdepth 1 -name "*f32*.c" -print 
@@ -119,26 +138,21 @@ def runner(path_to_MUSIC, path_to_fakeheaders, use_yaml=True):
     print("Starting runner")
     total_start = time.perf_counter()
     result_dict = {}
-    insn_list = ["abs_f32"] # is a list of oracle compiled binaries. 
     #path_to_fakeheaders = "pycparser/utils/fake_libc_include"
     path_to_ptx_semantics = "../ROCetta/ptx-semantics-tests/v6.5"
     #path_to_MUSIC = "./MUSIC/music"
     path_to_ptxc = f"{path_to_ptx_semantics}/c/ptxc.c"
     command_change_dir_to_ptx = f"cd {path_to_ptx_semantics}/c"
-    #all_insns = subprocess.check_output(f" find {path_to_ptx_semantics}/c -type f -print0 | xargs -0 basename -a", shell=True)
-    #all_insns_arr = str(all_insns).split('\\n')
-    # for f32
-    #insn_list = [insn for insn in all_insns_arr if insn.endswith("f32")]
-    #insn_list = insn_list[:100]
     print(insn_list)
-    ptxc_pm = ProgramManipulator(path_to_ptxc, path_to_fakeheaders)
+    ptxc_pm = ProgramManipulator(path_to_ptxc, path_to_fakeheaders,
+                                 other_headers=[f"-I{path_to_ptx_semantics}/c"])
     original_ptxc_contents = open(path_to_ptxc, "r").readlines()
 
     if use_yaml:
         insn_info = process_instructions_yaml(f"{path_to_ptx_semantics}/instructions.yaml")
     else:
-        test_info_command = f"python3 ../ROCetta/ptx-semantics-tests/gpusemtest/run_test.py ../ROCetta/ptx-semantics-tests/v6.5 c exec"
-        
+        test_info_command = f"python3 ../ROCetta/ptx-semantics-tests/gpusemtest/run_test.py {path_to_ptx_semantics} c exec"
+
 
     # set file depencies for instructions.
     file_dependencies = ["128types.h", "lop3_lut.h" , "ptxc.h", "ptxc_utils.h", "ptxc_utils_template.h", "readbyte_prmt.h", "testutils.h", "testutils.c"]
@@ -187,7 +201,7 @@ def runner(path_to_MUSIC, path_to_fakeheaders, use_yaml=True):
 
 
 # MUSIC path
-MUSIC = sys.argv[1] 
+MUSIC = sys.argv[1]
 
 # fake headers path
 fake_headers = sys.argv[2]
@@ -197,4 +211,9 @@ use_yaml = sys.argv[3]
 flag = False
 if use_yaml == "yaml":
     flag = True
-runner(MUSIC, fake_headers, use_yaml=flag)
+
+if len(sys.argv) == 5:
+    insn_list = file_insn_list(sys.argv[4])
+else:
+    insn_list = hc_insn_list()
+runner(MUSIC, fake_headers, insn_list, use_yaml=flag)

@@ -3,6 +3,7 @@ import subprocess
 import os
 import argparse
 import json
+import shutil
 
 # custom imports
 from mutator import Mutator
@@ -10,6 +11,11 @@ from equivalence_checker_cbmc import EquivalenceChecker
 from program_manipulation import ProgramManipulator 
 
 
+def copy_dependencies(dstdir, file_dependencies):
+    for f in file_dependencies:
+        dst = os.path.join(dstdir, os.path.basename(f))
+        if not os.path.exists(dst):
+            shutil.copyfile(f, dst)
 
 def L1_runner(oracle_program, func_name, test_suite, mutation_directory, compilation_info, solver, new_input_filename, music_exec, fakeheader_path, working_dir_name="working_directory/",  file_dependencies=[], pre_compile_flags=None,binary_folder=None, oracle_binary=None):
     run_data = {}
@@ -33,6 +39,8 @@ def L1_runner(oracle_program, func_name, test_suite, mutation_directory, compila
     if False:
         # not sure why this is here
         M.generate_mutations()
+
+    copy_dependencies(working_dir_name, file_dependencies)
 
     EQC = EquivalenceChecker(oracle_program, func_name, mutation_directory, test_suite, new_input_filename=new_input_filename, backend=solver, path_to_fakeheaders=fakeheader_path, working_directory=working_dir_name)
     time_ran, tests_pre_dd, tests_pos_dd = EQC.runner()

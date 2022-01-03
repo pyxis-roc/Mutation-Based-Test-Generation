@@ -31,7 +31,7 @@ class EquivalenceChecker(object):
         self.survived_mutations = survived_mutations
         self.path_to_fakeheaders = path_to_fakeheaders
         # dynamic values
-        self.oracle_manipulator = ProgramManipulator(oracle_program, path_to_fakeheaders)
+        self.oracle_manipulator = ProgramManipulator(oracle_program, path_to_fakeheaders, other_headers=[f"-I{working_directory}"])
         self.oracle_function = self.oracle_manipulator.get_function(function_name)
         self.inputs = EquivalenceChecker.process_inputs(input_file) if input_file is not None else []
         self.function_inputs = self.oracle_manipulator.get_function_inputs(function_name)
@@ -137,6 +137,7 @@ class EquivalenceChecker(object):
 
     def create_analysis(self, new_inputs):
         # create analysis directory
+        print("Analyzing")
         if not os.path.isdir("./analysis"):
 	        os.mkdir("./analysis")
         else:
@@ -149,7 +150,7 @@ class EquivalenceChecker(object):
                 mutation = i[1]
                 if input_values is not None and mutation is not None:
                     # extract mutated function as a string
-                    mutation_manipulator = ProgramManipulator(mutation, self.path_to_fakeheaders)
+                    mutation_manipulator = ProgramManipulator(mutation, self.path_to_fakeheaders, other_headers=[f"-I{self.working_dir}"])
                     mutated_func = mutation_manipulator.get_function(self.function_name)
                             
                     # classify inputs
@@ -207,7 +208,7 @@ class EquivalenceChecker(object):
 
         # extract mutated function from mutated program
         # Create manipulator for mutated program
-        mutated_pm = ProgramManipulator(mutated_program, self.path_to_fakeheaders)
+        mutated_pm = ProgramManipulator(mutated_program, self.path_to_fakeheaders, other_headers=[f"-I{self.working_dir}"])
         mutated_function = mutated_pm.get_function(self.function_name)
         mutated_function_name = "mutated_function"
         mutated_function = ProgramManipulator.rename_function(mutated_function, self.function_name, mutated_function_name)
