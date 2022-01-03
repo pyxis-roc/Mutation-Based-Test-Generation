@@ -17,7 +17,7 @@ from pathlib import Path
 
 class EquivalenceChecker(object):
 
-    def __init__(self, oracle_program, function_name, survived_mutations, input_file, new_input_filename="new_inputs.txt", backend="", path_to_fakeheaders="pycparser/utils/fake_libc_include", analysis=True, survived_mutation_outputs=None, create_new_suite=False):
+    def __init__(self, oracle_program, function_name, survived_mutations, input_file, new_input_filename="new_inputs.txt", backend="", path_to_fakeheaders="pycparser/utils/fake_libc_include", analysis=True, survived_mutation_outputs=None, create_new_suite=False, working_directory = "working_directory"):
         """
         Args:
         oracle_program is a path to the program.
@@ -40,13 +40,34 @@ class EquivalenceChecker(object):
         self.new_input_filename = new_input_filename
         self.do_analysis = analysis
         self.survived_mutation_outputs = survived_mutation_outputs
+        self.working_dir = working_directory
 
+    # stolen from smt2utils
+    @staticmethod
+    def conform_c(x):
+        """Conform to C's %0.13a"""
+
+        if x == "0x0.0p+0":
+            return "0x0.0000000000000p+0"
+        elif x == "-0x0.0p+0":
+            return "-0x0.0000000000000p+0"
+        else:
+            return x
+
+    @staticmethod
+    def float_hex2(x):
+        """Replacement for float.hex that does not discards sign from NaN"""
+
+        if math.isnan(x) and (math.copysign(1., x) == -1.0):
+            return "-nan"
+
+        return x.hex()
 
     @staticmethod
     def bin_to_float(binary):
-        return float.hex(struct.unpack('!f',struct.pack('!I', int(binary, 2)))[0])
-    
-    @staticmethod 
+        return EquivalenceChecker.conform_c(EquivalenceChecker.float_hex2(struct.unpack('!f',struct.pack('!I', int(binary, 2)))[0]))
+
+    @staticmethod
     def bin_to_int(b):
         return int(b, 2)
 
@@ -180,7 +201,7 @@ class EquivalenceChecker(object):
     def create_instrumented_program(self, mutated_program):
         # create .c file
         filename = f"equivalence_check_{ProgramManipulator.extract_last_file_from_prog_path(mutated_program)}.c"
-        f = open(f"working_directory/{filename}", "w+")
+        f = open(os.path.join(self.working_dir, filename), "w+")
         # add includes        
         includes = ProgramManipulator.get_all_includes(mutated_program)
 
@@ -228,8 +249,8 @@ class EquivalenceChecker(object):
 
     def get_counterexample_from_CBMC(self, instrumented_program, mutation_name):
         cbmc_json_filename = f"cbmc_output_{ProgramManipulator.extract_last_file_from_prog_path(mutation_name)}.json"
-        subprocess.call(f"cbmc --trace {instrumented_program} {self.backend} --json-ui > {cbmc_json_filename}", shell=True, cwd="working_directory/")
-        cbmc_results = open(f"working_directory/{cbmc_json_filename}", "r").read()
+        subprocess.call(f"cbmc --trace {instrumented_program} {self.backend} --json-ui > {cbmc_json_filename}", shell=True, cwd=self.working_dir)
+        cbmc_results = open(os.path.join(self.working_dir, cbmc_json_filename), "r").read()
         cbmc_json = json.loads(cbmc_results)
         trace = None
         for value in cbmc_json:
@@ -270,7 +291,7 @@ class EquivalenceChecker(object):
             pass
 
     def cleanup(self):
-        for p in Path("working_directory/").glob("equivalence_check*"):
+        for p in Path(self.working_dir).glob("equivalence_check*"):
             p.unlink()
 
 

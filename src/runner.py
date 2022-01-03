@@ -14,6 +14,7 @@ from program_manipulation import ProgramManipulator
 def L1_runner(oracle_program, func_name, test_suite, mutation_directory, compilation_info, solver, new_input_filename, music_exec, fakeheader_path, working_dir_name="working_directory/",  file_dependencies=[], pre_compile_flags=None,binary_folder=None, oracle_binary=None):
     run_data = {}
     M = Mutator(oracle_program, func_name, mutation_directory, compilation_info=compilation_info, compilation_pre_flags=pre_compile_flags, MUSIC_executable=music_exec, working_dir_name=working_dir_name, file_dependencies=file_dependencies)
+
     if binary_folder is None:
         M.generate_mutations()
     if test_suite is not None:
@@ -28,9 +29,12 @@ def L1_runner(oracle_program, func_name, test_suite, mutation_directory, compila
     else:
         print(f"Creating a test suite for all generated mutations")
     # For PTX Suite, every run is on all gen mutations.
-    
-    M.generate_mutations()
-    EQC = EquivalenceChecker(oracle_program, func_name, mutation_directory, test_suite, new_input_filename=new_input_filename, backend=solver, path_to_fakeheaders=fakeheader_path)
+
+    if False:
+        # not sure why this is here
+        M.generate_mutations()
+
+    EQC = EquivalenceChecker(oracle_program, func_name, mutation_directory, test_suite, new_input_filename=new_input_filename, backend=solver, path_to_fakeheaders=fakeheader_path, working_directory=working_dir_name)
     time_ran, tests_pre_dd, tests_pos_dd = EQC.runner()
     eqc_data = {
         "wall_time" : time_ran,
@@ -42,7 +46,8 @@ def L1_runner(oracle_program, func_name, test_suite, mutation_directory, compila
     print("Now will test newly generated inputs for mutation kill score.")
     if binary_folder is None:
         M.generate_mutations()
-    time_ran, total_mutations, mutations_killed = M.kill_mutations(new_input_filename, binary_folder)
+
+    time_ran, total_mutations, mutations_killed = M.kill_mutations(new_input_filename, binary_folder=binary_folder)
     mutator_pass2_data = {
                 "wall_time" : time_ran,
                 "total_mutations" : total_mutations,
@@ -53,7 +58,6 @@ def L1_runner(oracle_program, func_name, test_suite, mutation_directory, compila
     write_run_data(run_data, oracle_program)
     return run_data
 
-    
 def write_run_data(run_data, oracle_program):
     json_data = json.dumps(run_data)
     f = open(f"output_{ProgramManipulator.extract_last_file_from_prog_path(oracle_program)}.json", "w+")

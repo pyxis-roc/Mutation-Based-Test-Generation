@@ -61,9 +61,10 @@ class Mutator(object):
 
         subprocess.call(f"gcc {self.compilation_pre_flags} {mutation} {self.compilation_info} -o {mutation_executable}", shell=True, cwd=working_dir, timeout=5)
         # run on test suite
-        result = subprocess.call(f"./{mutation_executable} ../{test_suite} {mutation_output_file}", shell=True, cwd=working_dir, timeout=5)
+        ts_ = os.path.join('..', test_suite)
+        result = subprocess.call(f"./{mutation_executable} {ts_} {mutation_output_file}", shell=True, cwd=working_dir, timeout=5)
         
-
+        diff = False
         if result == 137:  # 137 is SIGKILL code.
             print(f"Unuseful mutation {mutation}. (Thread killed). Deleting.")
             subprocess.call(f"rm {self.mutated_program_dir_name}/{mutation}", shell=True, timeout=5)
@@ -77,13 +78,15 @@ class Mutator(object):
                     subprocess.call(f"rm {self.mutated_program_dir_name}/{mutation}", shell=True, timeout=5)
                     print(f"Test suite covers {mutation}. Deleting file.")
                 else:
+                    diff = True
                     print(f"{mutation} has not been killed. No differentiating test case found.")
             except Exception as e:
                 print(e)
                 print(f"Unuseful mutation {mutation}. Killing. In exception")
                 subprocess.call(f"rm {self.mutated_program_dir_name}/{mutation}", shell=True, timeout=5)
         # clean up
-        subprocess.call(f"rm {mutation_output_file} {mutation} {mutation_executable}", shell=True, cwd=working_dir, timeout=5)
+        if not diff:
+            subprocess.call(f"rm {mutation_output_file} {mutation} {mutation_executable}", shell=True, cwd=working_dir, timeout=5)
         # return mutation, open(test_suite, "r").readlines(), mutation_outputs
 
     def test_and_compare_mutation(self, test_suite, oracle_outputs, mutation_executable, survived_mutations, working_dir):
@@ -106,7 +109,8 @@ class Mutator(object):
             executable_name = ProgramManipulator.extract_last_file_from_prog_path(program_executable)
             subprocess.call(f"cp {program_executable} {working_dir}", shell=True, timeout=5)
 
-            result = subprocess.call(f"./{executable_name} ../{test_suite} {output_filename}", shell=True, cwd=working_dir, timeout=5)
+            ts_ = os.path.join('..', test_suite)
+            result = subprocess.call(f"./{executable_name} {ts_} {output_filename}", shell=True, cwd=working_dir, timeout=5)
             if result == 137: # 137 is SIGKILL code.
                 return None
             program_outputs = open(f"{working_dir}{output_filename}", "r").readlines()
@@ -167,7 +171,8 @@ class Mutator(object):
         subprocess.call(f"gcc {self.compilation_pre_flags} {ProgramManipulator.extract_last_file_from_prog_path(self.program_name)} {self.compilation_info} -o {oracle_executable}", shell=True, cwd=working_dir, timeout=5)
         # run oracle on test suite
         time.sleep(2)
-        subprocess.call(f"./{oracle_executable} ../{test_suite} {oracle_output_file}", shell=True, cwd=working_dir, timeout=5)
+        _ts = os.path.join('..', test_suite)
+        subprocess.call(f"./{oracle_executable} {_ts} {oracle_output_file}", shell=True, cwd=working_dir, timeout=5)
         # get oracle output
         oracle_outputs = open(f"{working_dir}{oracle_output_file}", "r").readlines()
         # for each mutation 
@@ -185,10 +190,11 @@ class Mutator(object):
         # for mutation in mutated_programs:
         #     self.test_and_compare_mutation(mutation, working_dir, oracle_outputs, test_suite)
         stop = time.perf_counter()
-        subprocess.call(f"rm {oracle_executable} {oracle_output_file}", shell=True, cwd=working_dir, timeout=5)
+        #subprocess.call(f"rm {oracle_executable} {oracle_output_file}", shell=True, cwd=working_dir, timeout=5)
 
         survived_mutations = [f for f in os.listdir(self.mutated_program_dir_name) if isfile(join(self.mutated_program_dir_name, f))]
         survived_mutations = len([m for m in survived_mutations if m.endswith(".c")])
+        print(survived_mutations)
         print(f"Total Killed Mutations: {total_mutations-survived_mutations} out of {total_mutations} total mutations")
         print(f"Kill ratio {(total_mutations-survived_mutations)/total_mutations}")
         print(f"Run Statistics:\nTime Taken: {stop-start} seconds")

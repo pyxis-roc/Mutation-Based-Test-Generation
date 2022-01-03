@@ -82,12 +82,12 @@ def run_single_insn(insn, ptxc_pm, path_to_ptx_semantics, path_to_MUSIC, path_to
     insn_file.close()
     # insn file is now ready for mutation.
     solver = ""  #default
-    run_data = L1_runner(insn_file_copy_path, function_name, f"{path_to_ptx_semantics}/{test_suite_path}", mutation_directory_name, "-lm", solver, f"new_inputs_{insn}", 
+    run_data = L1_runner(insn_file_copy_path, function_name, os.path.join(path_to_ptx_semantics, test_suite_path), mutation_directory_name, "-lm", solver, f"new_inputs_{insn}", 
     path_to_MUSIC, path_to_fakeheaders, working_dir_name=working_dir_name,  file_dependencies=file_dependencies, pre_compile_flags=pre_compile_flags,)
     result_dict[insn] = run_data
     try:
-        os.system(f"rm -rf {working_dir_name}")
-        os.system(f"rm -rf {mutation_directory_name}")
+        #os.system(f"rm -rf {working_dir_name}")
+        #os.system(f"rm -rf {mutation_directory_name}")
         os.system(f"rm {insn_file_copy_path}")
     except Exception as e:
         print("failed cleanup")
@@ -119,17 +119,17 @@ def runner(path_to_MUSIC, path_to_fakeheaders, use_yaml=True):
     print("Starting runner")
     total_start = time.perf_counter()
     result_dict = {}
-    #insn_list = ["add_rm_ftz_sat_f32", "add_sat_f32", "abs_f32"] # is a list of oracle compiled binaries. 
+    insn_list = ["abs_f32"] # is a list of oracle compiled binaries. 
     #path_to_fakeheaders = "pycparser/utils/fake_libc_include"
     path_to_ptx_semantics = "../ROCetta/ptx-semantics-tests/v6.5"
     #path_to_MUSIC = "./MUSIC/music"
     path_to_ptxc = f"{path_to_ptx_semantics}/c/ptxc.c"
     command_change_dir_to_ptx = f"cd {path_to_ptx_semantics}/c"
-    all_insns = subprocess.check_output(f" find {path_to_ptx_semantics}/c -type f -print0 | xargs -0 basename -a", shell=True)
-    all_insns_arr = str(all_insns).split('\\n')
+    #all_insns = subprocess.check_output(f" find {path_to_ptx_semantics}/c -type f -print0 | xargs -0 basename -a", shell=True)
+    #all_insns_arr = str(all_insns).split('\\n')
     # for f32
-    insn_list = [insn for insn in all_insns_arr if insn.endswith("f32")]
-    insn_list = insn_list[:100]
+    #insn_list = [insn for insn in all_insns_arr if insn.endswith("f32")]
+    #insn_list = insn_list[:100]
     print(insn_list)
     ptxc_pm = ProgramManipulator(path_to_ptxc, path_to_fakeheaders)
     original_ptxc_contents = open(path_to_ptxc, "r").readlines()
@@ -137,7 +137,7 @@ def runner(path_to_MUSIC, path_to_fakeheaders, use_yaml=True):
     if use_yaml:
         insn_info = process_instructions_yaml(f"{path_to_ptx_semantics}/instructions.yaml")
     else:
-        test_info_command = f"python3 ../ROCetta/ptx-semantics-tests/gpusemtest/run_test.py v6.5 c exec"
+        test_info_command = f"python3 ../ROCetta/ptx-semantics-tests/gpusemtest/run_test.py ../ROCetta/ptx-semantics-tests/v6.5 c exec"
         
 
     # set file depencies for instructions.
@@ -171,8 +171,10 @@ def runner(path_to_MUSIC, path_to_fakeheaders, use_yaml=True):
             test_suite_path = get_input_path(insn_info, insn)
         else:
             insn_info_command = test_info_command + f" {insn}"
-            output = subprocess.check_output(test_info_command, shell=True)
-            test_suite_path = output.split()[0].split(' ')[1]                
+            output = subprocess.check_output(insn_info_command, shell=True)
+            # this takes only the first input file
+            test_suite_path = output.splitlines()[1].split(b' ')[1].decode('utf-8')
+
             # run and parse gpusemtest/run_test.py
         try:
             run_single_insn(insn, ptxc_pm, path_to_ptx_semantics, path_to_MUSIC, path_to_fakeheaders, file_dependencies, pre_compile_flags, test_suite_path, result_dict)
