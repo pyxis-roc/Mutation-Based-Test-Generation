@@ -254,12 +254,17 @@ class EquivalenceChecker(object):
         cbmc_results = open(os.path.join(self.working_dir, cbmc_json_filename), "r").read()
         cbmc_json = json.loads(cbmc_results)
         trace = None
+        print(cbmc_json_filename)
+        if cbmc_json is not None:
+            if "cProverStatus" in cbmc_json[-1] and cbmc_json[-1]["cProverStatus"] == "success":
+                print(f"{mutation_name} is semantically identical to source!")
+
         for value in cbmc_json:
             if "result" in value:
                 try:
                     trace = value["result"][0]["trace"]
                 except Exception as e:
-                    print(e)
+                    print(type(e), str(e))
                     print(f"Trace not found for {mutation_name}")
                     return None
         if trace == None:
