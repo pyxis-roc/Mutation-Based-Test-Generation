@@ -56,7 +56,7 @@ def compile_mutated_binary(mutation,function_name, insn, ptxc_pm, command_change
         print(e)
         raise e
 
-def run_single_insn(insn, ptxc_pm, path_to_ptx_semantics, path_to_MUSIC, path_to_fakeheaders, file_dependencies, pre_compile_flags, test_suite_path, result_dict):
+def run_single_insn(insn, ptxc_pm, path_to_ptx_semantics, path_to_MUSIC, path_to_fakeheaders, file_dependencies, pre_compile_flags, test_suite_path, result_dict, eqv_on_all_mutations):
     mutation_directory_name = f"mutated-programs-{insn}"
     working_dir_name = f"working-directory-{insn}/"
     if not os.path.isdir(f"./{working_dir_name}"):
@@ -83,7 +83,7 @@ def run_single_insn(insn, ptxc_pm, path_to_ptx_semantics, path_to_MUSIC, path_to
     # insn file is now ready for mutation.
     solver = ""  #default
     run_data = L1_runner(insn_file_copy_path, function_name, os.path.join(path_to_ptx_semantics, test_suite_path), mutation_directory_name, "-lm", solver, f"new_inputs_{insn}", 
-    path_to_MUSIC, path_to_fakeheaders, working_dir_name=working_dir_name,  file_dependencies=file_dependencies, pre_compile_flags=pre_compile_flags,)
+                         path_to_MUSIC, path_to_fakeheaders, working_dir_name=working_dir_name,  file_dependencies=file_dependencies, pre_compile_flags=pre_compile_flags,equivalence_on_all_mutations=eqv_on_all_mutations)
     result_dict[insn] = run_data
     try:
         #os.system(f"rm -rf {working_dir_name}")
@@ -127,7 +127,7 @@ def find_insn_list(path_to_ptx_semantics, total=100):
 
     return insn_list
 
-def runner(path_to_MUSIC, path_to_fakeheaders, insn_list, use_yaml=True):
+def runner(path_to_MUSIC, path_to_fakeheaders, insn_list, use_yaml=True, eqv_on_all_mutations=False):
 
    # idea; start by only looking at tests of f32 type:
    # command to get all of them: find . -maxdepth 1 -name "*f32*.c" -print 
@@ -191,7 +191,7 @@ def runner(path_to_MUSIC, path_to_fakeheaders, insn_list, use_yaml=True):
 
             # run and parse gpusemtest/run_test.py
         try:
-            run_single_insn(insn, ptxc_pm, path_to_ptx_semantics, path_to_MUSIC, path_to_fakeheaders, file_dependencies, pre_compile_flags, test_suite_path, result_dict)
+            run_single_insn(insn, ptxc_pm, path_to_ptx_semantics, path_to_MUSIC, path_to_fakeheaders, file_dependencies, pre_compile_flags, test_suite_path, result_dict, eqv_on_all_mutations)
         except Exception as e:
             result_dict[insn] = {"Insn Failed due to exception" : e}
     write_run_data(result_dict, "Run_Results")
@@ -200,20 +200,32 @@ def runner(path_to_MUSIC, path_to_fakeheaders, insn_list, use_yaml=True):
 
 
 
-# MUSIC path
-MUSIC = sys.argv[1]
+if __name__ == "__main__":
+    import argparse
+    p = argparse.ArgumentParser(description="Run on all benchmarks")
+    p.add_argument("musicpath", help="Path to MUSIC executable")
+    p.add_argument("fakehdrs", help="Path to pycparser fake c headers")
+    p.add_argument("yaml", choices=["yaml", "no-yaml"], help="Use the instructions.yaml file to find tests (or use run_test.py instead)")
+    p.add_argument("list", nargs="?", help="File containing list of instructions to run")
+    p.add_argument("--full", action="store_true", help="Do not use existing test suite")
 
-# fake headers path
-fake_headers = sys.argv[2]
+    args = p.parse_args()
 
-# how to get input files
-use_yaml = sys.argv[3]
-flag = False
-if use_yaml == "yaml":
-    flag = True
+    # MUSIC path
+    MUSIC = args.musicpath
 
-if len(sys.argv) == 5:
-    insn_list = file_insn_list(sys.argv[4])
-else:
-    insn_list = hc_insn_list()
-runner(MUSIC, fake_headers, insn_list, use_yaml=flag)
+    # fake headers path
+    fake_headers = args.fakehdrs
+
+    # how to get input files
+    use_yaml = args.yaml
+    flag = use_yaml == "yaml"
+
+    if args.list:
+        insn_list = file_insn_list(sys.argv[4])
+    else:
+        insn_list = hc_insn_list()
+
+    eqvflag = args.full
+
+    runner(MUSIC, fake_headers, insn_list, use_yaml=flag, eqv_on_all_mutations=eqvflag)

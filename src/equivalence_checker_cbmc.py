@@ -14,6 +14,7 @@ import math
 import struct
 import multiprocessing as mp
 from pathlib import Path
+import sys
 
 class EquivalenceChecker(object):
 
@@ -219,7 +220,9 @@ class EquivalenceChecker(object):
 
         counter = 0
         param_string = ""
+        all_float = True # TODO: also applies to double
         for i in self.function_inputs:
+            all_float = all_float and i[1] == 'float'
             main_method.append(f"{i[1]} variable_{counter};")
             param_string += f"variable_{counter},"
             counter+=1
@@ -231,7 +234,10 @@ class EquivalenceChecker(object):
         main_method.append(f"{self.function_return_type} result = {self.function_name}({param_string});")
         main_method.append(f"{self.function_return_type}  mutated_result = {mutated_function_name}({param_string});")
         # set them equal so that --trace flag gives counterexample where they are not equal.
-        main_method.append("assert(result == mutated_result);")
+        if all_float:
+            main_method.append("assert((result == mutated_result) || (isnan(result) && isnan(mutated_result)));")
+        else:
+            main_method.append("assert(result == mutated_result);")
         main_method.append("return 0;")
         main_method.append("}")
 
@@ -289,7 +295,7 @@ class EquivalenceChecker(object):
         try:
             instrumented_program = self.create_instrumented_program(mutated_program)
             inputs = self.get_counterexample_from_CBMC(instrumented_program, mutated_program)
-            
+            sys.stdout.flush()
             return [inputs, mutated_program]
         except Exception as e:
             print("Caught Exception in equivalence_check_CBMC")
@@ -356,7 +362,7 @@ class EquivalenceChecker(object):
 
         print("Runner is Done.")
         print(f"Run Statistics:\nTime Taken: {stop-start} seconds")
-        return stop-start, inputs_pre_deduplication, inputs_post_deduplication
+        return stop-start, original_inputs, inputs_pre_deduplication, inputs_post_deduplication
 
 
 if __name__ == "__main__":

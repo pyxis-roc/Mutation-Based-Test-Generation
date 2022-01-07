@@ -7,6 +7,7 @@ import time
 import copy
 from os.path import isfile, join
 import multiprocessing as mp
+import math
 
 # TODO: try killing mutants with new test set
 
@@ -48,8 +49,9 @@ class Mutator(object):
         for i in range(len(o1)):
             v1 = float.fromhex(o1[i])
             v2 = float.fromhex(o2[i])
-            if v1 != v2:
-                print(f"Outputs at row {i+1} are not the same.\n{v1} vs {v2}.")
+            # nans never compare equal, but we need them to 
+            if v1 != v2 and not (math.isnan(v1) and math.isnan(v2)):
+                print(f"Outputs at row {i+1} are not the same.\n{v1} vs {v2}. ({o1[i].strip()} vs {o2[i].strip()})")
                 return False
         return True
 

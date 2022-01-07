@@ -17,13 +17,13 @@ def copy_dependencies(dstdir, file_dependencies):
         if not os.path.exists(dst):
             shutil.copyfile(f, dst)
 
-def L1_runner(oracle_program, func_name, test_suite, mutation_directory, compilation_info, solver, new_input_filename, music_exec, fakeheader_path, working_dir_name="working_directory/",  file_dependencies=[], pre_compile_flags=None,binary_folder=None, oracle_binary=None):
+def L1_runner(oracle_program, func_name, test_suite, mutation_directory, compilation_info, solver, new_input_filename, music_exec, fakeheader_path, working_dir_name="working_directory/",  file_dependencies=[], pre_compile_flags=None,binary_folder=None, oracle_binary=None, equivalence_on_all_mutations=False):
     run_data = {}
     M = Mutator(oracle_program, func_name, mutation_directory, compilation_info=compilation_info, compilation_pre_flags=pre_compile_flags, MUSIC_executable=music_exec, working_dir_name=working_dir_name, file_dependencies=file_dependencies)
 
     if binary_folder is None:
         M.generate_mutations()
-    if test_suite is not None:
+    if test_suite is not None and not equivalence_on_all_mutations:
         time_ran, total_mutations, mutations_killed = M.kill_mutations(test_suite, oracle_binary, binary_folder)
         mutator_pass1_data = {
                 "wall_time" : time_ran,
@@ -34,18 +34,15 @@ def L1_runner(oracle_program, func_name, test_suite, mutation_directory, compila
         run_data["mutator_pass_on_existing"] = mutator_pass1_data
     else:
         print(f"Creating a test suite for all generated mutations")
-    # For PTX Suite, every run is on all gen mutations.
-
-    if False:
-        # not sure why this is here
         M.generate_mutations()
 
     copy_dependencies(working_dir_name, file_dependencies)
 
     EQC = EquivalenceChecker(oracle_program, func_name, mutation_directory, test_suite, new_input_filename=new_input_filename, backend=solver, path_to_fakeheaders=fakeheader_path, working_directory=working_dir_name)
-    time_ran, tests_pre_dd, tests_pos_dd = EQC.runner()
+    time_ran, tests_original, tests_pre_dd, tests_pos_dd = EQC.runner()
     eqc_data = {
         "wall_time" : time_ran,
+        "num_tests_original": tests_original,
         "num_tests_gen_pre_dd" : tests_pre_dd,
         "num_tests_gen_post_dd" : tests_pos_dd,
         "suite_filename" : new_input_filename
