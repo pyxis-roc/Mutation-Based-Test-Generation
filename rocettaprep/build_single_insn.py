@@ -56,6 +56,7 @@ class PTXSemantics:
         subprocess.run([self.cpp] + self._get_cpp_args() + ["-MM", "-MF", t, self.csemantics], check=True)
         headers = ''.join(open(t, "r").readlines())
         headers = headers.replace('\\\n', '\n')
+        os.unlink(t)
 
         # parse the output which is formatted as a Make rule
         target = self.csemantics.stem + '.o:'
@@ -71,7 +72,7 @@ class PTXSemantics:
         return self.headers
 
     def create_single_insn_program(self, insn, sys_includes = [], user_includes = []):
-        insn_fn = f'execute_{insn}'
+        insn_fn = insn.insn_fn
 
         assert insn_fn in self.funcdef_nodes, f"{insn_fn} not found in {self.csemantics}"
 
@@ -82,9 +83,9 @@ class PTXSemantics:
         out.extend([f'#include <{x}>' for x in sys_includes])
         out.extend([f'#include "{x}"' for x in user_includes])
 
-        out.append(f'// START: {insn_fn}')
+        out.append(insn.start_marker)
         out.append(func_code)
-        out.append(f'// END: {insn_fn}')
+        out.append(insn.end_marker)
 
         return '\n'.join(out) + '\n'
 
@@ -134,6 +135,18 @@ class Insn:
     def test_file(self):
         return f'{self.insn}.c'
 
+    @property
+    def insn_fn(self):
+        return f'execute_{self.insn}'
+
+    @property
+    def start_marker(self):
+        return f'// START: {self.insn_fn}'
+
+    @property
+    def end_marker(self):
+        return f'// END: {self.insn_fn}'
+
     def __str__(self):
         return self.insn
 
@@ -144,7 +157,7 @@ def gen_insn_oracle(insn, oroot, p):
     if not odir.exists():
         odir.mkdir()
 
-    code = p.create_single_insn_program(str(insn),
+    code = p.create_single_insn_program(insn,
                                         ['stdlib.h', 'stdint.h', 'math.h'],
                                         hdrs)
 
