@@ -116,6 +116,25 @@ class PTXSemantics:
 
         return self.get_compile_command_primitive(f"{insn}_fn.c", f"{insn}.c", insn)
 
+def gen_insn_oracle(insn, oroot, p):
+    odir = oroot / f'working-directory-{insn}'
+    if not odir.exists():
+        odir.mkdir()
+
+    code = p.create_single_insn_program(insn,
+                                        ['stdlib.h', 'stdint.h', 'math.h'],
+                                        hdrs)
+
+    # the name _fn.c is part of the API, ...
+    with open(odir / f'{insn}_fn.c', "w") as f:
+        f.write(code)
+
+    p.create_single_insn_test_program(insn, odir)
+    with open(odir / "Makefile", "w") as f:
+        f.write(f"{insn}: {insn}.c\n\t")
+        compile_cmds = "\n\t".join([" ".join([str(x) for x in c]) for c in p.get_compile_command(insn)])
+        f.write(compile_cmds + "\n")
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
     p.add_argument("csemantics", help="C semantics file, usually ptxc.c")
@@ -137,20 +156,4 @@ if __name__ == "__main__":
     oroot = Path(args.outputdir)
 
     for insn in ['add_rm_ftz_f32']:
-        odir = oroot / f'working-directory-{insn}'
-        if not odir.exists():
-            odir.mkdir()
-
-        code = p.create_single_insn_program(insn,
-                                            ['stdlib.h', 'stdint.h', 'math.h'],
-                                            hdrs)
-
-        # the name _fn.c is part of the API, ...
-        with open(odir / f'{insn}_fn.c', "w") as f:
-            f.write(code)
-
-        p.create_single_insn_test_program(insn, odir)
-        with open(odir / "Makefile", "w") as f:
-            f.write(f"{insn}: {insn}.c\n\t")
-            compile_cmds = "\n\t".join([" ".join([str(x) for x in c]) for c in p.get_compile_command(insn)])
-            f.write(compile_cmds + "\n")
+        gen_insn_oracle(insn, oroot, p)
