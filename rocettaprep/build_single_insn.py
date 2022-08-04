@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 import os
 from collections import OrderedDict
+import shutil
 
 class FuncDefVisitor(c_ast.NodeVisitor):
     def __init__(self):
@@ -69,7 +70,9 @@ class PTXSemantics:
         self.headers = headers
         return self.headers
 
-    def create_single_insn_program(self, insn_fn, sys_includes = [], user_includes = []):
+    def create_single_insn_program(self, insn, sys_includes = [], user_includes = []):
+        insn_fn = f'execute_{insn}'
+
         assert insn_fn in self.funcdef_nodes, f"{insn_fn} not found in {self.csemantics}"
 
         generator = c_generator.CGenerator()
@@ -83,7 +86,35 @@ class PTXSemantics:
         out.append(func_code)
         out.append(f'// END: {insn_fn}')
 
-        return '\n'.join(out)
+        return '\n'.join(out) + '\n'
+
+    def create_single_insn_test_program(self, insn, dstdir):
+        # this is old style
+        test_program = self.csemantics.parent / (insn + '.c')
+        dst = dstdir / (insn + '.c')
+
+        shutil.copyfile(test_program, dst)
+
+    def get_compile_command_primitive(self, semc, testc, outputobj, compiler_cmd = None, libs = None):
+        def default_compiler(srcfiles, obj):
+            cmd = ["gcc"]
+            cmd.extend(["-I", self.csemantics.parent.absolute()])
+            cmd.extend(srcfiles)
+            cmd.extend(["-o", insn])
+            cmd.extend(libs)
+            return cmd
+
+        compiler_cmd = compiler_cmd or default_compiler
+        libs = libs or ["-lm"]
+
+        cmds = []
+        cmds.append(compiler_cmd([f"{self.csemantics.parent.absolute()}/testutils.c", semc, testc], outputobj))
+        return cmds
+
+    def get_compile_command(self, insn, obj = None):
+        obj = obj or insn
+
+        return self.get_compile_command_primitive(f"{insn}_fn.c", f"{insn}.c", insn)
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
@@ -110,9 +141,16 @@ if __name__ == "__main__":
         if not odir.exists():
             odir.mkdir()
 
-        code = p.create_single_insn_program(f'execute_{insn}',
+        code = p.create_single_insn_program(insn,
                                             ['stdlib.h', 'stdint.h', 'math.h'],
                                             hdrs)
 
-        with open(odir / f'{insn}.c', "w") as f:
+        # the name _fn.c is part of the API, ...
+        with open(odir / f'{insn}_fn.c', "w") as f:
             f.write(code)
+
+        p.create_single_insn_test_program(insn, odir)
+        with open(odir / "Makefile", "w") as f:
+            f.write(f"{insn}: {insn}.c\n\t")
+            compile_cmds = "\n\t".join([" ".join([str(x) for x in c]) for c in p.get_compile_command(insn)])
+            f.write(compile_cmds + "\n")
