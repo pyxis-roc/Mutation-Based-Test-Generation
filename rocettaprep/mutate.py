@@ -8,11 +8,14 @@
 import argparse
 from pathlib import Path
 import os
-from build_single_insn import Insn
+from build_single_insn import Insn, PTXSemantics
 import subprocess
+import csv
+import json
 
 class MUSICMutator:
-    def __init__(self, rootdir, music_executable, fixed_compilation_database = True):
+    def __init__(self, csemantics, rootdir, music_executable, fixed_compilation_database = True):
+        self.csemantics = csemantics
         self.rootdir = Path(rootdir)
         self.music = Path(music_executable)
         self.fixed_compilation_database = fixed_compilation_database
@@ -74,6 +77,48 @@ class MUSICMutator:
         print(" ".join([str(c) for c in cmd]))
         subprocess.run(cmd, check=True)
 
+    def _get_mutated_sources(self, odir, insn):
+        n = Path(insn.sem_file).stem + '_mut_db.csv'
+        with open((odir / n), "r") as f:
+
+            f.readline() # skip first line, seems to contain a header
+                         # that we're not interested in
+
+            d = csv.DictReader(f)
+            out = []
+            for row in d:
+                out.append(row['Mutant Filename'])
+
+            return out
+
+    def generate_mutation_makefile(self, insn):
+        odir = self.rootdir / insn.working_dir / "music"
+        srcs = self._get_mutated_sources(odir, insn)
+
+        p = PTXSemantics(self.csemantics, []) # since we only want the compiler commands
+
+        out = []
+
+        with open(odir.parent / "Makefile.music", "w") as f:
+            all_targets = " ".join([s[:-2] for s in srcs])
+            f.write(f"all: {all_targets}\n\n")
+
+            for s in srcs:
+                target = s[:-2] # remove .c
+                srcs = [str(odir / s)]
+                f.write(f"{target}: {' '.join(srcs)}\n\t")
+                cmds = p.get_compile_command_primitive(str(odir / s), insn.test_file,
+                                                       target)
+
+                out.append({'src': str(s), 'target': target})
+
+                f.write("\n\t".join([" ".join([str(cc) for cc in c])
+                                     for c in cmds]))
+                f.write("\n\n")
+
+        # also write out metadata for other tools to process
+        with open(odir.parent / "music.json", "w") as f:
+            json.dump(out, fp=f, indent='  ')
 
 class MULL:
     pass
@@ -81,6 +126,7 @@ class MULL:
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
+    p.add_argument("csemantics", help="C semantics file, usually ptxc.c")
     p.add_argument("rootdir", help="Directory used as root to store oracle files")
     p.add_argument("--mutator", choices=["MUSIC"], default="MUSIC")
     p.add_argument("--music", help="MUSIC executable", default="../../MUSIC/music")
@@ -89,10 +135,11 @@ if __name__ == "__main__":
 
 
     if args.mutator == "MUSIC":
-        mut = MUSICMutator(args.rootdir, music_executable = args.music)
+        mut = MUSICMutator(args.csemantics, args.rootdir, music_executable = args.music)
     else:
         raise NotImplementedError(f"Do not support mutator {args.mutator}")
 
     for insn in ['add_rm_ftz_f32']:
         i = Insn(insn)
         mut.generate_mutations(i)
+        mut.generate_mutation_makefile(i)
