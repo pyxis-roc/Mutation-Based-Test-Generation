@@ -90,17 +90,18 @@ class PTXSemantics:
 
     def create_single_insn_test_program(self, insn, dstdir):
         # this is old style
-        test_program = self.csemantics.parent / (insn + '.c')
-        dst = dstdir / (insn + '.c')
+        test_program = self.csemantics.parent / insn.test_file
+        dst = dstdir / insn.test_file
 
         shutil.copyfile(test_program, dst)
 
     def get_compile_command_primitive(self, semc, testc, outputobj, compiler_cmd = None, libs = None):
+
         def default_compiler(srcfiles, obj):
             cmd = ["gcc"]
             cmd.extend(["-I", self.csemantics.parent.absolute()])
             cmd.extend(srcfiles)
-            cmd.extend(["-o", insn])
+            cmd.extend(["-o", obj])
             cmd.extend(libs)
             return cmd
 
@@ -108,37 +109,58 @@ class PTXSemantics:
         libs = libs or ["-lm"]
 
         cmds = []
-        cmds.append(compiler_cmd([f"{self.csemantics.parent.absolute()}/testutils.c", semc, testc], outputobj))
+        cmds.append(compiler_cmd([f"{self.csemantics.parent.absolute()}/testutils.c", semc, testc],
+                                 outputobj))
         return cmds
 
     def get_compile_command(self, insn, obj = None):
         obj = obj or insn
 
-        return self.get_compile_command_primitive(f"{insn}_fn.c", f"{insn}.c", insn)
+        return self.get_compile_command_primitive(insn.sem_file, insn.test_file, str(insn))
+
+class Insn:
+    def __init__(self, insn):
+        self.insn = insn
+
+    @property
+    def working_dir(self):
+        return f'working-directory-{self.insn}'
+
+    @property
+    def sem_file(self):
+        return f'{self.insn}_fn.c'
+
+    @property
+    def test_file(self):
+        return f'{self.insn}.c'
+
+    def __str__(self):
+        return self.insn
 
 def gen_insn_oracle(insn, oroot, p):
-    odir = oroot / f'working-directory-{insn}'
+    insn = Insn(insn)
+
+    odir = oroot / insn.working_dir
     if not odir.exists():
         odir.mkdir()
 
-    code = p.create_single_insn_program(insn,
+    code = p.create_single_insn_program(str(insn),
                                         ['stdlib.h', 'stdint.h', 'math.h'],
                                         hdrs)
 
-    # the name _fn.c is part of the API, ...
-    with open(odir / f'{insn}_fn.c', "w") as f:
+    with open(odir / insn.sem_file, "w") as f:
         f.write(code)
 
     p.create_single_insn_test_program(insn, odir)
     with open(odir / "Makefile", "w") as f:
-        f.write(f"{insn}: {insn}.c\n\t")
+        f.write(f"{insn}: {insn.test_file}\n\t")
         compile_cmds = "\n\t".join([" ".join([str(x) for x in c]) for c in p.get_compile_command(insn)])
         f.write(compile_cmds + "\n")
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
     p.add_argument("csemantics", help="C semantics file, usually ptxc.c")
-    p.add_argument("outputdir", help="Output directory, will be created if it does not exist")
+    p.add_argument("outputdir", help="Output root directory, will be created if it does not exist")
 
     p.add_argument("--fake-includes", help="Path to pycparser stub includes", default="/usr/share/python3-pycparser/fake_libc_include/") # this default is good for most Debian-based machines
     p.add_argument("-I", dest="include_dirs", help="Include directory for preprocessor", action="append", default=[])
