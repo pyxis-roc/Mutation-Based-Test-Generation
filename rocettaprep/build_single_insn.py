@@ -16,6 +16,7 @@ import os
 from collections import OrderedDict
 import shutil
 import logging
+from setup_workdir import WorkParams
 
 logger = logging.getLogger(__name__)
 
@@ -210,23 +211,17 @@ def gen_insn_oracle(insn, oroot, p):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
-    p.add_argument("csemantics", help="C semantics file, usually ptxc.c")
-    p.add_argument("outputdir", help="Output root directory, will be created if it does not exist")
-
-    p.add_argument("--fake-includes", help="Path to pycparser stub includes", default="/usr/share/python3-pycparser/fake_libc_include/") # this default is good for most Debian-based machines
-    p.add_argument("-I", dest="include_dirs", help="Include directory for preprocessor", action="append", default=[])
+    p.add_argument("workdir", help="Work directory")
 
     args = p.parse_args()
+    wp = WorkParams.load_from(args.workdir)
 
-    if not os.path.exists(args.outputdir):
-        os.mkdir(args.outputdir)
-
-    p = PTXSemantics(args.csemantics, [args.fake_includes] + args.include_dirs)
+    p = PTXSemantics(wp.csemantics, [wp.pycparser_includes] + wp.include_dirs)
     p.parse()
     p.get_functions()
     hdrs = p.get_headers()
 
-    oroot = Path(args.outputdir)
+    oroot = Path(args.workdir)
 
     for insn in ['add_rm_ftz_f32']:
         gen_insn_oracle(insn, oroot, p)

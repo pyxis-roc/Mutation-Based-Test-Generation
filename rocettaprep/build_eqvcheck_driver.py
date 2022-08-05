@@ -12,6 +12,7 @@ import argparse
 from pathlib import Path
 import os
 import json
+from setup_workdir import WorkParams
 
 class EqvCheckBuilder:
     def __init__(self, csemantics, rootdir, insn, include_dirs = None):
@@ -61,20 +62,13 @@ def build_eqvcheck_driver(csemantics, rootdir, mutator, insn, include_dirs):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Build the driver for equivalence checks")
-    p.add_argument("csemantics", help="C Semantics File") # needed to locate include files
-    p.add_argument("rootdir", help="Root working directory")
+    p.add_argument("workdir", help="Root working directory")
     p.add_argument("--mutator", choices=["MUSIC"], default="MUSIC")
-    p.add_argument("--fake-includes", help="Path to pycparser stub includes", default="/usr/share/python3-pycparser/fake_libc_include/") # this default is good for most Debian-based machines
 
     args = p.parse_args()
+    wp = WorkParams.load_from(args.workdir)
+    incl = [wp.pycparser_includes] + wp.include_dirs
 
-    if not os.path.exists(args.csemantics):
-        raise FileNotFoundError(f"C semantics file: '{args.csemantics}' does not exist")
-
-    rd = Path(args.rootdir)
-    if not (rd.exists() and rd.is_dir()):
-        raise FileNotFoundError(f"Root directory: '{args.rootdir}' does not exist or is not a directory")
-    include_dirs = [args.fake_includes]
     for insn in ['add_rm_ftz_f32']:
         i = Insn(insn)
-        build_eqvcheck_driver(args.csemantics, rd, args.mutator, i, include_dirs)
+        build_eqvcheck_driver(wp.csemantics, wp.workdir, args.mutator, i, incl)

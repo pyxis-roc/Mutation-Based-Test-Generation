@@ -13,6 +13,8 @@ import subprocess
 import csv
 import json
 import logging
+from setup_workdir import WorkParams
+
 logger = logging.getLogger(__name__)
 
 class MUSICMutator:
@@ -101,16 +103,15 @@ class MULL:
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
-    p.add_argument("csemantics", help="C semantics file, usually ptxc.c")
-    p.add_argument("rootdir", help="Directory used as root to store oracle files")
+    p.add_argument("workdir", help="Work directory")
     p.add_argument("--mutator", choices=["MUSIC"], default="MUSIC")
     p.add_argument("--music", help="MUSIC executable", default="../../MUSIC/music")
 
     args = p.parse_args()
-
+    wp = WorkParams.load_from(args.workdir)
 
     if args.mutator == "MUSIC":
-        mut = MUSICMutator(args.csemantics, args.rootdir, music_executable = args.music)
+        mut = MUSICMutator(wp.csemantics, wp.workdir, music_executable = args.music)
     else:
         raise NotImplementedError(f"Do not support mutator {args.mutator}")
 
