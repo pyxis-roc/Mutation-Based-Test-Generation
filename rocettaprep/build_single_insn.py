@@ -15,6 +15,9 @@ from pathlib import Path
 import os
 from collections import OrderedDict
 import shutil
+import logging
+
+logger = logging.getLogger(__name__)
 
 class FuncDefVisitor(c_ast.NodeVisitor):
     def __init__(self):
@@ -35,6 +38,9 @@ class PTXSemantics:
         cpp_args = ["-DPYCPARSER"] # this is to "hide" C99 constructs like _Generic
         cpp_args.append('-D__STDC_VERSION__=199901L')
         cpp_args.extend([f"-I{x}" for x in self.include_dirs if x])
+        print(f"cpp_args: '{' '.join([str(c) for c in cpp_args])}'")
+
+        return cpp_args
         return cpp_args
 
     def parse(self):
@@ -71,13 +77,18 @@ class PTXSemantics:
         self.headers = headers
         return self.headers
 
-    def create_single_insn_program(self, insn, sys_includes = [], user_includes = []):
-        insn_fn = insn.insn_fn
-
+    def get_func_code(self, insn_fn):
         assert insn_fn in self.funcdef_nodes, f"{insn_fn} not found in {self.csemantics}"
 
         generator = c_generator.CGenerator()
         func_code = generator.visit(self.funcdef_nodes[insn_fn])
+
+        return func_code
+
+    def create_single_insn_program(self, insn, sys_includes = [], user_includes = []):
+        insn_fn = insn.insn_fn
+
+        func_code = self.get_func_code(insn_fn)
 
         out = []
         out.extend([f'#include <{x}>' for x in sys_includes])
