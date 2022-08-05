@@ -12,7 +12,6 @@ import argparse
 from pathlib import Path
 import os
 import json
-from setup_workdir import WorkParams
 
 class EqvCheckBuilder:
     def __init__(self, csemantics, rootdir, insn, include_dirs = None):
@@ -27,10 +26,7 @@ class EqvCheckBuilder:
             self.semfile_contents = f.readlines()
 
     def process_mutfile(self, mutfile):
-        # this is slow since pycparser needs to parse the ptxc includes :(
-        # TODO: use a separate script to setup fake_ptxc_includes, since it speeds this up considerably.
-
-        ps = PTXSemantics(mutfile, self.include_dirs + [self.rootdir / 'includes',
+        ps = PTXSemantics(mutfile, self.include_dirs + [self.rootdir / 'ptxc_fake_includes',
                                                         self.csemantics.parent])
         ps.parse()
         ps.get_functions()
@@ -61,6 +57,8 @@ def build_eqvcheck_driver(csemantics, rootdir, mutator, insn, include_dirs):
     print(mutsrcs)
 
 if __name__ == "__main__":
+    from setup_workdir import WorkParams
+
     p = argparse.ArgumentParser(description="Build the driver for equivalence checks")
     p.add_argument("workdir", help="Root working directory")
     p.add_argument("--mutator", choices=["MUSIC"], default="MUSIC")

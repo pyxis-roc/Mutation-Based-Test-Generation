@@ -13,7 +13,6 @@ import subprocess
 import csv
 import json
 import logging
-from setup_workdir import WorkParams
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +101,8 @@ class MULL:
 
 
 if __name__ == "__main__":
+    from setup_workdir import WorkParams
+    
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
     p.add_argument("workdir", help="Work directory")
     p.add_argument("--mutator", choices=["MUSIC"], default="MUSIC")

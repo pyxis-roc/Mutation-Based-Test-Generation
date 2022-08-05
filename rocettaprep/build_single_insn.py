@@ -16,7 +16,6 @@ import os
 from collections import OrderedDict
 import shutil
 import logging
-from setup_workdir import WorkParams
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,6 @@ class PTXSemantics:
         cpp_args.extend([f"-I{x}" for x in self.include_dirs if x])
         print(f"cpp_args: '{' '.join([str(c) for c in cpp_args])}'")
 
-        return cpp_args
         return cpp_args
 
     def parse(self):
@@ -210,6 +208,8 @@ def gen_insn_oracle(insn, oroot, p):
         f.write(compile_cmds + "\n")
 
 if __name__ == "__main__":
+    from setup_workdir import WorkParams
+
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
     p.add_argument("workdir", help="Work directory")
 

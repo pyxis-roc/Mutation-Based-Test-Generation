@@ -10,6 +10,8 @@ from pathlib import Path
 import json
 import itertools
 import sys
+from build_single_insn import PTXSemantics
+from pycparser import parse_file, c_ast, c_generator
 
 class WorkParams:
     def __init__(self):
@@ -17,6 +19,10 @@ class WorkParams:
         self.csemantics = None
         self.pycparser_includes = None
         self.include_dirs = None
+
+    @property
+    def all_includes(self):
+        return [self.pycparser_includes] + self.include_dirs
 
     @staticmethod
     def load_from(directory):
@@ -55,6 +61,38 @@ class WorkParams:
 
             p = json.dump(x, fp=f, indent='  ')
 
+
+class TypedefVisitor(c_ast.NodeVisitor):
+    def __init__(self, filename):
+        self.td = []
+        self.filename = filename
+
+    def visit_Typedef(self, node):
+        if node.coord.file == self.filename:
+            self.td.append(node)
+
+def create_ptx_semantics_fake_includes(wp):
+    ps = PTXSemantics(wp.csemantics, wp.all_includes)
+    includes = ps.get_headers()
+    hdrs = includes + list(ps.EXCLUDE_INDIRECT)
+    generator = c_generator.CGenerator()
+
+    fid = wp.workdir / 'ptxc_fake_includes'
+    if not fid.exists():
+        fid.mkdir()
+
+    for h in hdrs:
+        ast = parse_file(wp.csemantics.parent / h,
+                         use_cpp = True, cpp_path='cpp', cpp_args = ps._get_cpp_args())
+
+        tdv = TypedefVisitor(str(wp.csemantics.parent / h))
+        tdv.visit(ast)
+
+        if len(tdv.td):
+            with open(fid / h, "w") as f:
+                for td in tdv.td:
+                    print(generator.visit(td) + ";", file=f)
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Setup a work directory")
     p.add_argument("csemantics", help="C Semantics File")
@@ -83,5 +121,6 @@ if __name__ == "__main__":
         if not d.exists():
             print("WARNING: Include directory {d} does not exist (check --fake-includes or -I)", file=sys.stderr)
 
+    create_ptx_semantics_fake_includes(wp)
     wp.save()
     print("Setup done")
