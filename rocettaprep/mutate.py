@@ -12,6 +12,8 @@ from build_single_insn import Insn, PTXSemantics
 import subprocess
 import csv
 import json
+import logging
+logger = logging.getLogger(__name__)
 
 class MUSICMutator:
     def __init__(self, csemantics, rootdir, music_executable, fixed_compilation_database = True):
@@ -27,35 +29,8 @@ class MUSICMutator:
         if not self.rootdir.exists():
             raise FileNotFoundError(f"Root directory does not exist: {self.rootdir}")
 
-    def _get_line_range(self, insn):
-        with open(self.rootdir / insn.working_dir / insn.sem_file, "r") as f:
-            sm = insn.start_marker
-            em = insn.end_marker
-
-            start = -1
-            end = -1
-
-            for i, l in enumerate(f, 1):
-                if l.startswith(sm):
-                    start = i
-                    break
-            else:
-                raise ValueError(f"Start marker {sm} not found in {f.name}")
-
-
-            for i, l in enumerate(f, 1):
-                if l.startswith(em):
-                    end = i
-                    break
-            else:
-                raise ValueError(f"End marker {em} not found in {f.name}")
-
-            assert start != -1 and end != -1
-
-            return start, end
-
     def generate_mutations(self, insn):
-        start, end = self._get_line_range(insn)
+        start, end = insn.get_line_range(self.rootdir / insn.working_dir / insn.sem_file)
         odir = self.rootdir / insn.working_dir / "music"
 
         if not odir.exists():
@@ -74,7 +49,7 @@ class MUSICMutator:
             # TODO: maybe add some compile commands as well
             cmd.append("--")
 
-        print(" ".join([str(c) for c in cmd]))
+        logging.debug(f"Mutate command {' '.join([str(c) for c in cmd])}")
         subprocess.run(cmd, check=True)
 
     def _get_mutated_sources(self, odir, insn):

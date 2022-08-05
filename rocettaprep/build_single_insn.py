@@ -150,6 +150,33 @@ class Insn:
     def __str__(self):
         return self.insn
 
+    def get_line_range(self, src):
+        with open(src, "r") as f:
+            sm = self.start_marker
+            em = self.end_marker
+
+            start = -1
+            end = -1
+
+            for i, l in enumerate(f, 1):
+                if l.startswith(sm):
+                    start = i
+                    break
+            else:
+                raise ValueError(f"Start marker {sm} not found in {f.name}")
+
+
+            for i, l in enumerate(f, 1):
+                if l.startswith(em):
+                    end = i
+                    break
+            else:
+                raise ValueError(f"End marker {em} not found in {f.name}")
+
+            assert start != -1 and end != -1
+
+            return start, end
+
 def gen_insn_oracle(insn, oroot, p):
     insn = Insn(insn)
 
