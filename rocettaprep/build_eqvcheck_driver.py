@@ -13,7 +13,7 @@ from pathlib import Path
 import os
 import json
 import shutil
-
+from eqvcheck_templates import EqvCheckTemplate
 class EqvCheckBuilder:
     def __init__(self, csemantics, rootdir, insn, include_dirs = None):
         self.csemantics = Path(csemantics)
@@ -31,18 +31,12 @@ class EqvCheckBuilder:
         if not odir.exists():
             odir.mkdir()
 
-        if self.insn.insn == 'add_rm_ftz_f32': # TODO: TESTING
-            with open(odir / self.insn.test_file, "w") as f:
-                f.write("float nondet_float();\n")
-                f.write("int main(void) {\n")
-                f.write("  float a, b, result_orig, result_mut;\n")
-                f.write("  float b;\n")
-                f.write("  a = nondet_float();\n")
-                f.write("  b = nondet_float();\n")
-                f.write(f"  result_orig = {self.insn.insn_fn}(a, b);\n")
-                f.write(f"  result_mut = mutated_fn(a, b);\n")
-                f.write("  assert(result_orig == result_mut || (isnan(result_orig) && isnan(result_mut)));\n")
-                f.write("}\n")
+        # generate driver
+        tmpl = EqvCheckTemplate(self.insn, "mutated_fn")
+
+        with open(odir / self.insn.test_file, "w") as f:
+            f.write("\n".join(tmpl.get_decls()))
+            f.write(tmpl.get_template())
 
     def process_mutfile(self, mutfile):
         ps = PTXSemantics(mutfile, self.include_dirs + [self.rootdir / 'ptxc_fake_includes',
@@ -50,7 +44,7 @@ class EqvCheckBuilder:
         ps.parse()
         ps.get_functions()
 
-        # TODO: rename function
+        # TODO: rename function via AST rewrite
         code = ps.get_func_code(self.insn.insn_fn)
         code = code.replace(self.insn.insn_fn, "mutated_fn") # should really do a AST rewrite!
 
@@ -71,7 +65,7 @@ def load_music_json(rootdir, insn):
         muts = json.load(fp=f)
         return list([rootdir / insn.working_dir / "music" / x['src'] for x in muts])
 
-def build_eqvcheck_driver(csemantics, rootdir, mutator, insn, include_dirs):
+def build_eqvcheck_driver(csemantics, rootdir, mutator, insn, include_dirs, setup_only = False):
     if mutator != "MUSIC":
         raise NotImplementedError(f"Don't know how to build equivalence checker for {mutator}")
 
@@ -79,8 +73,9 @@ def build_eqvcheck_driver(csemantics, rootdir, mutator, insn, include_dirs):
     cs = Path(csemantics)
     ecb = EqvCheckBuilder(csemantics, rootdir, insn, include_dirs)
     ecb.setup()
-    for s in mutsrcs:
-        ecb.process_mutfile(s)
+    if not setup_only:
+        for s in mutsrcs:
+            ecb.process_mutfile(s)
 
     #print(mutsrcs)
 
@@ -90,6 +85,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Build the driver for equivalence checks")
     p.add_argument("workdir", help="Root working directory")
     p.add_argument("--mutator", choices=["MUSIC"], default="MUSIC")
+    p.add_argument("--driver-only", action="store_true", help="Only generate the driver")
 
     args = p.parse_args()
     wp = WorkParams.load_from(args.workdir)
@@ -97,4 +93,4 @@ if __name__ == "__main__":
 
     for insn in ['add_rm_ftz_f32']:
         i = Insn(insn)
-        build_eqvcheck_driver(wp.csemantics, wp.workdir, args.mutator, i, incl)
+        build_eqvcheck_driver(wp.csemantics, wp.workdir, args.mutator, i, incl, args.driver_only)
