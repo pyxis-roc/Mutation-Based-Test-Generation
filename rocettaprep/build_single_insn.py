@@ -16,6 +16,7 @@ import os
 from collections import OrderedDict
 import shutil
 import logging
+from rocprepcommon import *
 
 logger = logging.getLogger(__name__)
 
@@ -212,16 +213,22 @@ if __name__ == "__main__":
 
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
     p.add_argument("workdir", help="Work directory")
+    p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
 
     args = p.parse_args()
-    wp = WorkParams.load_from(args.workdir)
+    insns = get_instructions(args.insn)
 
-    p = PTXSemantics(wp.csemantics, [wp.pycparser_includes] + wp.include_dirs)
-    p.parse()
-    p.get_functions()
-    hdrs = p.get_headers()
+    if len(insns):
+        wp = WorkParams.load_from(args.workdir)
 
-    oroot = Path(args.workdir)
+        p = PTXSemantics(wp.csemantics, [wp.pycparser_includes] + wp.include_dirs)
+        p.parse()
+        p.get_functions()
+        hdrs = p.get_headers()
 
-    for insn in ['add_rm_ftz_f32']:
-        gen_insn_oracle(insn, oroot, p)
+        oroot = Path(args.workdir)
+
+        for insn in insns:
+            gen_insn_oracle(insn, oroot, p)
+
+    print(f"{len(insns)} instructions processed.")

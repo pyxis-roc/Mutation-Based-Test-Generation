@@ -13,6 +13,7 @@ import subprocess
 import csv
 import json
 import logging
+from rocprepcommon import *
 
 logger = logging.getLogger(__name__)
 
@@ -102,11 +103,12 @@ class MULL:
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
-    
+
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
     p.add_argument("workdir", help="Work directory")
     p.add_argument("--mutator", choices=["MUSIC"], default="MUSIC")
     p.add_argument("--music", help="MUSIC executable", default="../../MUSIC/music")
+    p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
 
     args = p.parse_args()
     wp = WorkParams.load_from(args.workdir)
@@ -116,7 +118,7 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError(f"Do not support mutator {args.mutator}")
 
-    for insn in ['add_rm_ftz_f32']:
+    for insn in get_instructions(args.insn):
         i = Insn(insn)
         mut.generate_mutations(i)
         mut.generate_mutation_makefile(i)
