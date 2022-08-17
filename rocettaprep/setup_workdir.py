@@ -19,6 +19,7 @@ class WorkParams:
         self.csemantics = None
         self.pycparser_includes = None
         self.include_dirs = None
+        self.tests_dir = None
 
     @property
     def all_includes(self):
@@ -32,7 +33,8 @@ class WorkParams:
 
             for path_param in ['workdir', 'csemantics',
                                'pycparser_includes',
-                               'include_dirs']:
+                               'include_dirs',
+                               'tests_dir']:
 
                 if isinstance(p[path_param], list):
                     setattr(wp, path_param, [Path(x) for x in p[path_param]])
@@ -50,7 +52,8 @@ class WorkParams:
             x = {}
             for path_param in ['workdir', 'csemantics',
                                'pycparser_includes',
-                               'include_dirs']:
+                               'include_dirs',
+                               'tests_dir']:
 
                 v = getattr(self, path_param)
 
@@ -110,6 +113,7 @@ if __name__ == "__main__":
     wp.workdir = Path(args.workdir).absolute()
     wp.pycparser_includes = Path(args.fake_includes).absolute()
     wp.include_dirs = [Path(p).absolute() for p in args.include_dirs]
+    wp.tests_dir = wp.csemantics.parent.parent
 
     if not wp.csemantics.exists():
         raise FileNotFoundError(f"C semantics file: {wp.csemantics} not found")
