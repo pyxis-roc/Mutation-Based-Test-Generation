@@ -30,7 +30,7 @@ class TempFile:
             if hasattr(self, "_tmp_output"):
                 return self._tmp_output
             else:
-                h, tmp_output = tempfile.mkstemp(prefix="output_" + self.insn.insn + "_")
+                h, tmp_output = tempfile.mkstemp(prefix=self.prefix)
                 os.close(h)
                 self._tmp_output = tmp_output
                 return tmp_output
@@ -38,6 +38,14 @@ class TempFile:
     def cleanup(self):
         if not self.path and self._tmp_output:
             os.unlink(self._tmp_output)
+
+    def __str__(self):
+        if self.path:
+            return f"TempFile(path={repr(self.path)})"
+        else:
+            return f"TempFile(prefix={repr(self.prefix)},...)"
+
+    __repr__ = __str__
 
 class InsnTest:
     def __init__(self, wp, insn):
@@ -48,7 +56,7 @@ class InsnTest:
         with open(self.wp.workdir / self.insn.working_dir / "testcases.json", "r") as f:
             self.insn_info = json.load(fp=f)
 
-    def gen_tests(self, binary = None, output = None):
+    def gen_tests(self, binary = None, output = None, filter_fn = lambda x: True):
         if binary is None:
             # run the oracle
             binary = self.wp.workdir / self.insn.working_dir / self.insn.insn
@@ -58,8 +66,8 @@ class InsnTest:
         else:
             tmp_output = TempFile(path = output)
 
-        # TODO: this format doesn't work for all tests
-        for t in self.insn_info['tests']:
+        # TODO: this command-line format doesn't work for all tests
+        for t in filter(filter_fn, self.insn_info['tests']):
             yield TestInfo(cmdline=[binary, self.wp.tests_dir / t['input'], tmp_output],
                            tmp_output = tmp_output,
                            gold_output= self.wp.tests_dir / t['output'])
