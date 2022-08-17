@@ -67,7 +67,7 @@ class InsnTest:
             tmp_output = TempFile(path = output)
 
         # TODO: this command-line format doesn't work for all tests
-        for t in filter(filter_fn, self.insn_info['tests']):
+        for i, t in filter(filter_fn, enumerate(self.insn_info['tests'])):
             yield TestInfo(cmdline=[binary, self.wp.tests_dir / t['input'], tmp_output],
                            tmp_output = tmp_output,
                            gold_output= self.wp.tests_dir / t['output'])
