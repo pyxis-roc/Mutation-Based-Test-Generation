@@ -101,13 +101,48 @@ class MUSICMutator:
 class MULL:
     pass
 
+class MUSICHelper:
+    srcdir = "music"
+    
+    def __init__(self, wp):
+        self.wp = wp
+
+    def get_mutants(self, insn):
+        workdir = self.wp.workdir / insn.working_dir
+
+        with open(workdir / "music.json", "r") as f:
+            mutants = json.load(fp=f)
+
+        return mutants
+
+    def get_survivors(self, insn, experiment):
+        workdir = self.wp.workdir / insn.working_dir
+
+        with open(workdir / f"mutation-testing.{experiment}.json", "r") as f:
+            survivors = json.load(fp=f)
+
+        return survivors
+
+    def save_survivors(self, insn, experiment, survivors):
+        with open(self.wp.workdir / insn.working_dir / f"mutation-testing.{experiment}.json", "w") as f:
+            json.dump(survivors, fp=f, indent='  ')
+
+
+def get_mutation_helper(mutator, wp):
+    if mutator == "MUSIC":
+        return MUSICHelper(wp)
+    else:
+        raise NotImplementedError(f"Support for {mutator} not yet implemented")
+
+def get_mutators():
+    return ["MUSIC"]
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
 
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
     p.add_argument("workdir", help="Work directory")
-    p.add_argument("--mutator", choices=["MUSIC"], default="MUSIC")
+    p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--music", help="MUSIC executable", default="../../MUSIC/music")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
 

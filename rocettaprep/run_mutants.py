@@ -12,7 +12,7 @@ from rocprepcommon import *
 from build_single_insn import Insn
 import json
 import subprocess
-
+from mutate import MUSICHelper, get_mutation_helper, get_mutators
 
 def compare(wp, insn, test_info):
     output_file = test_info.tmp_output.get_name()
@@ -33,15 +33,13 @@ def run_single_test(wp, insn, test_info):
         # missing binaries should be handled differently?
         return False
 
-def run_tests(wp, insn):
+def run_tests(wp, insn, muthelper):
     tt = InsnTest(wp, insn)
     tt.load_tests()
 
     workdir = wp.workdir / insn.working_dir
 
-    # TODO: support other mutants?
-    with open(workdir / "music.json", "r") as f:
-        mutants = json.load(fp=f)
+    mutants = muthelper.get_mutants(insn)
 
     out = []
     for mut in mutants:
@@ -63,6 +61,7 @@ if __name__ == "__main__":
 
     p.add_argument("workdir", help="Work directory")
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
+    p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
 
     args = p.parse_args()
@@ -70,10 +69,12 @@ if __name__ == "__main__":
 
     if len(insns):
         wp = WorkParams.load_from(args.workdir)
+        muthelper = get_mutation_helper(args.mutator, wp)
 
         for i in insns:
             insn = Insn(i)
-            survivors = run_tests(wp, insn)
+            survivors = run_tests(wp, insn, muthelper)
             print(f"{len(survivors)} survivors for {i}")
+
             with open(wp.workdir / insn.working_dir / f"mutation-testing.{args.experiment}.json", "w") as f:
                 json.dump(survivors, fp=f, indent='  ')
