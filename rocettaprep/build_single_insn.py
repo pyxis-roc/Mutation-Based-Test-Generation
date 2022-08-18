@@ -162,6 +162,14 @@ class Insn:
         return self.insn
 
     def get_line_range(self, src):
+
+        # the original code in mutator.py for the registered report
+        # had an off-by-one error that caused MUSIC not to mutate the
+        # last line of the semantics.
+        #
+        # for example: music on abs_f32 yields 95 mutants with this
+        # code, but only 70 with the original code.
+
         with open(src, "r") as f:
             sm = self.start_marker
             em = self.end_marker
