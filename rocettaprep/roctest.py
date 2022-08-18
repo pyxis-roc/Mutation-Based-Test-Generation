@@ -52,22 +52,29 @@ class InsnTest:
         self.wp = wp
         self.insn = insn
 
+    def set_insn_info(self, insn_info):
+        self.insn_info = insn_info
+
     def load_tests(self):
         with open(self.wp.workdir / self.insn.working_dir / "testcases.json", "r") as f:
-            self.insn_info = json.load(fp=f)
+            self.set_insn_info(json.load(fp=f))
 
-    def gen_tests(self, binary = None, output = None, filter_fn = lambda x: True):
+    def gen_tests(self, binary = None, output_fn = None, filter_fn = lambda x: True):
+        def default_output_fn(index, testcase, insn):
+            return TempFile(prefix="output_" + insn.insn + "_")
+
         if binary is None:
             # run the oracle
             binary = self.wp.workdir / self.insn.working_dir / self.insn.insn
 
-        if output is None:
-            tmp_output = TempFile(prefix="output_" + self.insn.insn + "_")
-        else:
-            tmp_output = TempFile(path = output)
+        output_fn = output_fn or default_output_fn
 
-        # TODO: this command-line format doesn't work for all tests
         for i, t in filter(filter_fn, enumerate(self.insn_info['tests'])):
+            tmp_output = output_fn(i, t, self.insn)
+
+            # TODO: this command-line format doesn't work for all tests, esp. those that execute
+            # with multiple threads
+
             yield TestInfo(cmdline=[binary, self.wp.tests_dir / t['input'], tmp_output],
                            tmp_output = tmp_output,
                            gold_output= self.wp.tests_dir / t['output'])
