@@ -78,6 +78,7 @@ class MUSICMutator:
 
         with open(odir.parent / "Makefile.music", "w") as f:
             all_targets = " ".join([s[:-2] for s in srcs])
+            f.write("CFLAGS ?= -g -O3\n\n")
             f.write(f"all: {all_targets}\n\n")
 
             for s in srcs:
@@ -85,7 +86,7 @@ class MUSICMutator:
                 srcs = [str(odir / s)]
                 f.write(f"{target}: {' '.join(srcs)}\n\t")
                 cmds = p.get_compile_command_primitive(str(odir / s), insn.test_file,
-                                                       target)
+                                                       target, cflags=["${CFLAGS}"])
 
                 out.append({'src': str(s), 'target': target})
 

@@ -107,10 +107,11 @@ class PTXSemantics:
 
         shutil.copyfile(test_program, dst)
 
-    def get_compile_command_primitive(self, semc, testc, outputobj, compiler_cmd = None, libs = None):
+    def get_compile_command_primitive(self, semc, testc, outputobj, compiler_cmd = None, libs = None, cflags = None):
 
-        def default_compiler(srcfiles, obj):
+        def default_compiler(srcfiles, obj, cflags):
             cmd = ["gcc"]
+            cmd.extend(cflags)
             cmd.extend(["-I", self.csemantics.parent.absolute()])
             cmd.extend(srcfiles)
             cmd.extend(["-o", obj])
@@ -119,10 +120,10 @@ class PTXSemantics:
 
         compiler_cmd = compiler_cmd or default_compiler
         libs = libs or ["-lm"]
-
+        cflags = cflags or []
         cmds = []
         cmds.append(compiler_cmd([f"{self.csemantics.parent.absolute()}/testutils.c", semc, testc],
-                                 outputobj))
+                                 outputobj, cflags))
         return cmds
 
     def get_compile_command(self, insn, obj = None):
