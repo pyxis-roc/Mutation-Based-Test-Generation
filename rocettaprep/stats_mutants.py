@@ -30,5 +30,19 @@ if __name__ == "__main__":
 
             out[i] = {'survivors': len(survivors), 'mutants': len(mutants)}
 
+            try:
+                survivors2 = muthelper.get_survivors(insn, args.experiment, round2=True)
+                out[i]['round2'] = len(survivors2)
+            except FileNotFoundError:
+                pass
+
+            eqvfile = wp.workdir / insn.working_dir / f'eqvcheck_results.{args.experiment}.json'
+            if eqvfile.exists():
+                with open(eqvfile, "r") as f:
+                    noneq_mutants = json.load(fp=f)
+
+                out[i]['noneq_mutants'] = len(noneq_mutants)
+
+
         print(out)
 
