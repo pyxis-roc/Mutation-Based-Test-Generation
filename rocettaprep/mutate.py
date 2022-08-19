@@ -103,7 +103,7 @@ class MULL:
 
 class MUSICHelper:
     srcdir = "music"
-    
+
     def __init__(self, wp):
         self.wp = wp
 
