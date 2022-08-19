@@ -50,7 +50,7 @@ class TyHelper:
 
 class FloatTyHelper(TyHelper):
     def check_eqv(self, v1, v2):
-        return f"isnan(({v1}) && isnan({v2})) || ({v1} == {v2})"
+        return f"(isnan({v1}) && isnan({v2})) || ({v1} == {v2})"
 
 
 ty_helpers = {}
