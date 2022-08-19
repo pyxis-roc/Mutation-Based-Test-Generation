@@ -15,6 +15,7 @@ import subprocess
 from mutate import MUSICHelper, get_mutation_helper, get_mutators
 import itertools
 import os
+import json
 
 class CBMCExecutor:
     def __init__(self, wp, experiment):
@@ -28,8 +29,8 @@ class CBMCExecutor:
         cmd = ["cbmc", "--json-ui", "--trace", "-I", str(self.wp.csemantics.parent)]
         cmd.extend(xinc)
         cmd.append(str(mutant))
-        h = os.open(ofile, os.O_WRONLY | os.O_CREAT, mode=0o666)
-        #print(" ".join(cmd))
+        h = os.open(ofile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o666)
+        print(" ".join(cmd))
         r = subprocess.run(cmd, stdout=h)
         os.close(h)
         return r.returncode == 0
@@ -49,9 +50,15 @@ def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False):
     else:
         run_on = survivors
 
+    results = []
     for p in run_on:
-        res = executor.run(insn, workdir / "eqchk" / p)
-        print('equivalence check for', p, "failed" if not res else "passed")
+        mutsrc = workdir / "eqchk" / p
+        res = executor.run(insn, mutsrc)
+        if not res:
+            results.append(p)
+
+    with open(workdir / f"eqvcheck_results.{experiment}.json", "w") as f:
+        json.dump(results, fp=f)
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
