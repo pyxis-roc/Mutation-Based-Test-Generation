@@ -115,10 +115,15 @@ class MUSICHelper:
 
         return mutants
 
-    def get_survivors(self, insn, experiment):
+    def get_survivors(self, insn, experiment, round2 = False):
         workdir = self.wp.workdir / insn.working_dir
 
-        with open(workdir / f"mutation-testing.{experiment}.json", "r") as f:
+        if round2:
+            fname = workdir / f"mutation-testing.round2.{experiment}.json"
+        else:
+            fname = workdir / f"mutation-testing.{experiment}.json"
+
+        with open(fname, "r") as f:
             survivors = json.load(fp=f)
 
         return survivors
