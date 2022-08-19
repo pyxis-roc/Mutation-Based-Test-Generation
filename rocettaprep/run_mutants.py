@@ -58,6 +58,11 @@ def run_tests(wp, insn, muthelper, experiment, round2 = False):
                                  filter_fn = filter_fn):
             print(test)
             res = run_single_test(wp, insn, test)
+
+            #if res:
+            for x in test.cmdline:
+                if isinstance(x, TempFile): x.cleanup()
+
             if not res: break
         else:
             # mutant survived tests
