@@ -75,9 +75,18 @@ class InsnTest:
             # TODO: this command-line format doesn't work for all tests, esp. those that execute
             # with multiple threads
 
-            yield TestInfo(cmdline=[binary, self.wp.tests_dir / t['input'], tmp_output],
+            inpfile = Path(t['input'])
+            outfile = Path(t['output'])
+
+            if not inpfile.is_absolute():
+                inpfile = self.wp.tests_dir / inpfile
+
+            if not outfile.is_absolute():
+                outfile = self.wp.tests_dir / outfile
+
+            yield TestInfo(cmdline=[binary, inpfile, tmp_output],
                            tmp_output = tmp_output,
-                           gold_output= self.wp.tests_dir / t['output'])
+                           gold_output= outfile)
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
