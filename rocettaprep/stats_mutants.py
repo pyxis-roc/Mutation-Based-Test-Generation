@@ -31,8 +31,9 @@ if __name__ == "__main__":
             out[i] = {'survivors': len(survivors), 'mutants': len(mutants)}
 
             try:
-                survivors2 = muthelper.get_survivors(insn, args.experiment, round2=True)
-                out[i]['round2'] = len(survivors2)
+                for r2source in ['eqvcheck', 'fuzzer_simple']:
+                    survivors2 = muthelper.get_survivors(insn, args.experiment, round2=True, r2source=r2source)
+                    out[i][f'round2.{r2source}'] = len(survivors2)
             except FileNotFoundError:
                 pass
 
@@ -41,8 +42,7 @@ if __name__ == "__main__":
                 with open(eqvfile, "r") as f:
                     noneq_mutants = json.load(fp=f)
 
-                out[i]['noneq_mutants'] = len(noneq_mutants)
-
+            out[i][f'noneq_mutants'] = len(noneq_mutants)
 
         print(out)
 

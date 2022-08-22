@@ -115,11 +115,11 @@ class MUSICHelper:
 
         return mutants
 
-    def get_survivors(self, insn, experiment, round2 = False):
+    def get_survivors(self, insn, experiment, round2 = False, r2source = 'eqvcheck'):
         workdir = self.wp.workdir / insn.working_dir
 
         if round2:
-            fname = workdir / f"mutation-testing.round2.{experiment}.json"
+            fname = workdir / f"mutation-testing.round2.{r2source}.{experiment}.json"
         else:
             fname = workdir / f"mutation-testing.{experiment}.json"
 
