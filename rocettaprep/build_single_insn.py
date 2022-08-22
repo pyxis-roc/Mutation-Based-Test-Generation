@@ -109,11 +109,11 @@ class PTXSemantics:
 
     def get_compile_command_primitive(self, semc, testc, outputobj, compiler_cmd = None, libs = None, cflags = None):
 
-        def default_compiler(srcfiles, obj, cflags):
+        def default_compiler(srcfiles, obj, cflags, libs):
             cmd = ["gcc"]
             cmd.extend(cflags)
             cmd.extend(["-I", self.csemantics.parent.absolute()])
-            cmd.extend(srcfiles)
+            cmd.extend(filter(lambda x: x is not None, srcfiles))
             cmd.extend(["-o", obj])
             cmd.extend(libs)
             return cmd
@@ -123,7 +123,7 @@ class PTXSemantics:
         cflags = cflags or []
         cmds = []
         cmds.append(compiler_cmd([f"{self.csemantics.parent.absolute()}/testutils.c", semc, testc],
-                                 outputobj, cflags))
+                                 outputobj, cflags, libs))
         return cmds
 
     def get_compile_command(self, insn, obj = None):
