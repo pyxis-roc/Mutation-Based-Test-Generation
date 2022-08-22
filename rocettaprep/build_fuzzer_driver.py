@@ -115,6 +115,11 @@ class FuzzerBuilder:
             f.write("\n".join(tmpl.get_decls()) + "\n")
             f.write(tmpl.get_template())
 
+        with open(odir / "struct_info.txt", "w") as f:
+            ptypes = insn_info[self.insn.insn]['params']
+            struct_fmt = "".join([ty_helpers[pty].struct_unpacker() for pty in ptypes])
+            f.write(struct_fmt)
+
     def process_mutfile(self, mutfile):
         src = self.wp.workdir / self.insn.working_dir / "eqchk" / mutfile.name
         dst = self.wp.workdir / self.insn.working_dir / "libfuzzer_simple" / mutfile.name

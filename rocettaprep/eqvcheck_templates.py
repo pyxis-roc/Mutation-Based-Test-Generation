@@ -45,6 +45,20 @@ class TyHelper:
     def nondet_fn_decl(self):
         return f"{self.tyname} {self.nondet_fn()};"
 
+    def struct_unpacker(self):
+        # this is going to cause issues if struct has padding.
+
+        if self.tyname == 'float':
+            return 'f'
+        elif self.tyname == 'double':
+            return 'd'
+        elif self.tyname == 'int32_t':
+            return 'i'
+        elif self.tyname in ('uint32_t', 'unsigned int'):
+            return 'I'
+        else:
+            raise NotImplementedError(f"Need struct unpacker for {self.tyname}")
+
     def check_eqv(self, v1, v2):
         return f"{v1} == {v2}"
 
