@@ -186,7 +186,7 @@ def run_gather_witnesses(wp, insn, experiment):
 if __name__ == "__main__":
     from setup_workdir import WorkParams
 
-    p = argparse.ArgumentParser(description="Run equivalence tests on mutants")
+    p = argparse.ArgumentParser(description="Gather witness outputs from equivalence checkers")
 
     p.add_argument("workdir", help="Work directory")
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
