@@ -92,24 +92,80 @@ class FuzzerTemplateSimple:
 
         return "\n".join(out)
 
+class FuzzerTemplateCustom(FuzzerTemplateSimple):
+    """Fuzzer template for Custom mutator that does stratified sampling."""
+
+    def get_decls(self):
+        return super().get_decls() + ['#include "strata_sampler.h"']
+
+    def get_template(self):
+        out = []
+        out.append("#ifdef __cplusplus")
+        out.append(f'extern "C"')
+        out.append("#endif")
+        out.append(f'int LLVMFuzzerCustomMutator(const uint8_t *Data, size_t Size, size_t MaxSize, unsigned int Seed) {{')
+
+        args = []
+        sz = []
+
+        # use a struct to load args, with the possible caveat that any
+        # packing might increase search space unnecessarily?
+
+        out.append("  struct arg_struct {")
+
+        for i, ty in enumerate(self.get_param_types()):
+            args.append(f"args->arg{i}")
+            sz.append(f"sizeof({ty})")
+            out.append(f"    {ty} arg{i};")
+
+        out.append("  } *args;")
+
+        szcheck = "+".join(sz)
+        out.append("  if(MaxSize < sizeof(struct arg_struct)) return 0;")
+
+        # packing check
+        out.append(f"  assert(sizeof(struct arg_struct) == {szcheck});")
+        out.append("")
+
+        out.append("  args = (struct arg_struct *) Data;")
+
+        out.append("  srand(Seed);")
+
+        for arg, ty in zip(args, self.get_param_types()):
+            out.append(f"  {arg} = sample_{ty}();")
+
+        out.append("return sizeof(struct arg_struct);")
+        out.append("}")
+
+        fn = "\n".join(out) + "\n\n"
+
+        fn += super().get_template()
+
+        return fn
+
 class FuzzerBuilder:
-    def __init__(self, wp, insn, muthelper):
+    def __init__(self, wp, insn, muthelper, template = 'simple'):
         self.wp = wp
         self.insn = insn
         self.muthelper = muthelper
+        self.template = template
+        print(self.template)
 
     def setup(self):
         # testfile = self.wp.workdir / self.insn.working_dir / self.insn.test_file
         # with open(testfile, "r") as f:
         #     self.testfile_contents = f.readlines()
 
-        odir = self.wp.workdir / self.insn.working_dir / "libfuzzer_simple"
+        odir = self.wp.workdir / self.insn.working_dir / f"libfuzzer_{self.template}"
 
         if not odir.exists():
             odir.mkdir()
 
-        # generate driver
-        tmpl = FuzzerTemplateSimple(self.insn, "mutated_fn")
+        if self.template == 'simple':
+            # generate driver
+            tmpl = FuzzerTemplateSimple(self.insn, "mutated_fn")
+        elif self.template == 'custom':
+            tmpl = FuzzerTemplateCustom(self.insn, "mutated_fn")
 
         with open(odir / self.insn.test_file, "w") as f:
             f.write("\n".join(tmpl.get_decls()) + "\n")
@@ -122,7 +178,7 @@ class FuzzerBuilder:
 
     def process_mutfile(self, mutfile):
         src = self.wp.workdir / self.insn.working_dir / "eqchk" / mutfile.name
-        dst = self.wp.workdir / self.insn.working_dir / "libfuzzer_simple" / mutfile.name
+        dst = self.wp.workdir / self.insn.working_dir / f"libfuzzer_{self.template}" / mutfile.name
 
         # this expects the equivalence checker to have run first
         if not src.exists():
@@ -136,12 +192,16 @@ class FuzzerBuilder:
             cmd = ["clang-13"] # clang-12 should also work?
             cmd.extend(cflags)
             cmd.extend(["-I", self.wp.csemantics.parent.absolute()])
+
+            if self.template == 'custom':
+                cmd.extend(["-I", self.wp.workdir / 'samplers'])
+
             cmd.extend(filter(lambda x: x is not None, srcfiles))
             cmd.extend(["-o", obj])
             cmd.extend(libs)
             return cmd
 
-        odir = self.wp.workdir / self.insn.working_dir / "libfuzzer_simple"
+        odir = self.wp.workdir / self.insn.working_dir / f"libfuzzer_{self.template}"
         srcs = [x['src'] for x in self.muthelper.get_mutants(self.insn)]
 
         p = PTXSemantics(self.wp.csemantics, []) # since we only want the compiler commands
@@ -166,11 +226,11 @@ class FuzzerBuilder:
                 f.write("\n\n")
 
 
-def build_fuzzer_driver(wp, insn, muthelper, setup_only = False):
+def build_fuzzer_driver(wp, insn, muthelper, setup_only = False, fuzzer = 'simple'):
     mutants = muthelper.get_mutants(insn)
     mutsrcs = [wp.workdir / insn.working_dir / muthelper.srcdir / x['src'] for x in mutants]
 
-    fb = FuzzerBuilder(wp, insn, muthelper)
+    fb = FuzzerBuilder(wp, insn, muthelper, template=fuzzer)
     fb.setup()
     if not setup_only:
         for s in mutsrcs:
@@ -187,6 +247,7 @@ if __name__ == "__main__":
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--driver-only", action="store_true", help="Only generate the driver")
+    p.add_argument("--fuzzer", choices=['simple', 'custom'], default='simple')
 
     args = p.parse_args()
     wp = WorkParams.load_from(args.workdir)
@@ -195,4 +256,4 @@ if __name__ == "__main__":
     for insn in get_instructions(args.insn):
         print(insn)
         i = Insn(insn)
-        build_fuzzer_driver(wp, i, muthelper, setup_only = args.driver_only)
+        build_fuzzer_driver(wp, i, muthelper, setup_only = args.driver_only, fuzzer = args.fuzzer)

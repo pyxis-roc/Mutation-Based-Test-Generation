@@ -12,6 +12,7 @@ import itertools
 import sys
 from build_single_insn import PTXSemantics
 from pycparser import parse_file, c_ast, c_generator
+import os
 
 class WorkParams:
     def __init__(self):
@@ -74,6 +75,16 @@ class TypedefVisitor(c_ast.NodeVisitor):
         if node.coord.file == self.filename:
             self.td.append(node)
 
+def create_sampler_includes(wp):
+    p = Path(__file__).parent.absolute() / 'samplers'
+
+    try:
+        os.unlink(wp.workdir / 'samplers')
+    except FileNotFoundError:
+        pass
+
+    os.symlink(p, wp.workdir / 'samplers', target_is_directory = True)
+
 def create_ptx_semantics_fake_includes(wp):
     ps = PTXSemantics(wp.csemantics, wp.all_includes)
     includes = ps.get_headers()
@@ -126,5 +137,6 @@ if __name__ == "__main__":
             print("WARNING: Include directory {d} does not exist (check --fake-includes or -I)", file=sys.stderr)
 
     create_ptx_semantics_fake_includes(wp)
+    create_sampler_includes(wp)
     wp.save()
     print("Setup done")
