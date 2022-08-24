@@ -31,7 +31,7 @@ if __name__ == "__main__":
             out[i] = {'survivors': len(survivors), 'mutants': len(mutants)}
 
             try:
-                for r2source in ['eqvcheck', 'fuzzer_simple']:
+                for r2source in ['eqvcheck', 'fuzzer_simple', 'fuzzer_custom']:
                     survivors2 = muthelper.get_survivors(insn, args.experiment, round2=True, r2source=r2source)
                     out[i][f'round2.{r2source}'] = len(survivors2)
             except FileNotFoundError:
