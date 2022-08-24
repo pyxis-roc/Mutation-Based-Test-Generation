@@ -33,7 +33,7 @@ class FuzzerExecutor:
         print(r.returncode)
         #return r.returncode == 0
 
-def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False):
+def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 'simple'):
     tt = InsnTest(wp, insn)
 
     workdir = wp.workdir / insn.working_dir
@@ -54,12 +54,12 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False):
 
     results = []
     for p in run_on:
-        mutsrc = workdir / "libfuzzer_simple" / p
+        mutsrc = workdir / f"libfuzzer_{fuzzer}" / p
         res = executor.run(insn, mutsrc)
         if not res:
             results.append(p)
 
-    with open(workdir / f"libfuzzer_simple_results.{experiment}.json", "w") as f:
+    with open(workdir / f"libfuzzer_{fuzzer}_results.{experiment}.json", "w") as f:
         json.dump(results, fp=f)
 
 if __name__ == "__main__":
@@ -72,6 +72,8 @@ if __name__ == "__main__":
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
     p.add_argument("--all", help="Run the fuzzer on all mutants, not just survivors", action="store_true")
+    p.add_argument("--fuzzer", help="Choose variant of fuzzer to run",
+                   choices=['simple', 'custom'], default='simple')
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -82,5 +84,5 @@ if __name__ == "__main__":
 
         for i in insns:
             insn = Insn(i)
-            run_fuzzer(wp, insn, args.experiment, muthelper, all_mutants = args.all)
+            run_fuzzer(wp, insn, args.experiment, muthelper, all_mutants = args.all, fuzzer=args.fuzzer)
 

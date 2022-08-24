@@ -63,7 +63,7 @@ class FuzzerOutput:
             inp = self.gen_inputs(unpacked_data, struct_fmt)
             return tuple(inp)
 
-def run_gather_fuzzer(wp, insn, experiment, muthelper):
+def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple'):
     tt = InsnTest(wp, insn)
 
     workdir = wp.workdir / insn.working_dir
@@ -73,7 +73,7 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper):
 
     output_inputs = set() # confusing .., used for deduplication
     for p in mutants:
-        mutsrc = workdir / "libfuzzer_simple" / p['target']
+        mutsrc = workdir / f"libfuzzer_{fuzzer}" / p['target']
         inputs = info.get_inputs(insn, mutsrc)
         if inputs is not None and inputs not in output_inputs:
             output_inputs.add(inputs)
@@ -81,8 +81,8 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper):
     if len(output_inputs) == 0:
         return
 
-    inpfile = workdir / f"libfuzzer_simple_inputs.{experiment}.ssv"
-    outfile = workdir / "outputs" / f"libfuzzer_simple_outputs.{experiment}.ssv"
+    inpfile = workdir / f"libfuzzer_{fuzzer}_inputs.{experiment}.ssv"
+    outfile = workdir / "outputs" / f"libfuzzer_{fuzzer}_outputs.{experiment}.ssv"
 
     with open(inpfile, "w") as fin:
         for x in output_inputs:
@@ -91,7 +91,7 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper):
     with open(workdir / "testcases.json", "r") as f:
         testcases = json.load(fp=f)
 
-    srcname = f'libfuzzer_simple.{experiment}'
+    srcname = f'libfuzzer_{fuzzer}.{experiment}'
 
     i = None
     for i, t in enumerate(testcases['tests']):
@@ -109,7 +109,7 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper):
     it.set_insn_info(testcases)
 
     # always regenerate everything
-    for t in it.gen_tests(filter_fn=lambda x: x[1]['source'] == f'libfuzzer_simple.{experiment}',
+    for t in it.gen_tests(filter_fn=lambda x: x[1]['source'] == f'libfuzzer_{fuzzer}.{experiment}',
                           output_fn = lambda ndx, tc, insn: TempFile(path=tc['output'])):
         cmdline = [c.get_name() if isinstance(c, TempFile) else c for c in t.cmdline]
         subprocess.run(cmdline, check=True)
@@ -123,6 +123,8 @@ if __name__ == "__main__":
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
+    p.add_argument("--fuzzer", help="Choose variant of fuzzer outputs to collect",
+                   choices=['simple', 'custom'], default='simple')
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -133,5 +135,5 @@ if __name__ == "__main__":
 
         for i in insns:
             insn = Insn(i)
-            run_gather_fuzzer(wp, insn, args.experiment, muthelper)
+            run_gather_fuzzer(wp, insn, args.experiment, muthelper, fuzzer = args.fuzzer)
 
