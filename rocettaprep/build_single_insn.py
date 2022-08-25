@@ -186,7 +186,7 @@ class Insn:
                 raise ValueError(f"Start marker {sm} not found in {f.name}")
 
 
-            for i, l in enumerate(f, 1):
+            for i, l in enumerate(f, start+1):
                 if l.startswith(em):
                     end = i
                     break
