@@ -51,7 +51,11 @@ class MUSICMutator:
             # TODO: maybe add some compile commands as well
             cmd.append("--")
 
+            # TODO: move this to use wp.include_dirs?
+            cmd.extend(["-I", self.csemantics.parent])
+
         logging.debug(f"Mutate command {' '.join([str(c) for c in cmd])}")
+        print(f"Mutate command {' '.join([str(c) for c in cmd])}")
         subprocess.run(cmd, check=True)
 
     def _get_mutated_sources(self, odir, insn):

@@ -29,13 +29,13 @@ class FuzzerOutput:
     def gen_inputs(self, data, struct_fmt):
         def fmt_value(d, ty):
             if ty == "I":
-                return d
+                return str(d)
             elif ty == 'f':
                 return float_hex2(d)
             elif ty == 'd':
                 return float_hex2(d)
             elif ty == 'i':
-                return d
+                return str(d)
             else:
                 raise NotImplementedError(f"Unhandled struct fmt type {ty}")
 
@@ -57,6 +57,10 @@ class FuzzerOutput:
 
         with open(ofile, "rb") as f:
             data = f.read()
+            if len(data) == 0:
+                print(f"WARNING: {ofile} is 0-byte, most likely the fuzzer crashed due to non-input reasons")
+                return None
+
             unpacked_data = struct.unpack(struct_fmt, data)
 
 

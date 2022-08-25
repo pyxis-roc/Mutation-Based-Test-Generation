@@ -31,7 +31,11 @@ insn_info = {
     'sub_rn_ftz_sat_f32': {'ret_type': 'float',
                            'params': ('float', 'float')},
     'sub_rz_ftz_sat_f32': {'ret_type': 'float',
-                           'params': ('float', 'float')}
+                           'params': ('float', 'float')},
+    'abs_s32': {'ret_type': 'int32_t',
+                'params': ('int32_t',)},
+    'add_u32': {'ret_type': 'uint32_t',
+                'params': ('uint32_t', 'uint32_t')},
     }
 
 

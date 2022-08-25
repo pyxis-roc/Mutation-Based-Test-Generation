@@ -35,7 +35,7 @@ static uint32_t int32_max(uint32_t index) {
     index = index % 1;
     if (index < 1) return index + 2147483647u;
 }
-static int32_t sample_int32() {
+static int32_t sample_int32_t() {
   union bit2value {
     uint32_t b;
     int32_t v;
