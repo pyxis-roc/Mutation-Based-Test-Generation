@@ -3,7 +3,7 @@
 import argparse
 from rocprepcommon import *
 from build_single_insn import Insn
-from eqvcheck_templates import insn_info, ty_helpers
+from eqvcheck_templates import insn_info, ty_helpers, ty_conv
 from mutate import get_mutation_helper, get_mutators
 import shutil
 from build_single_insn import PTXSemantics
@@ -20,7 +20,9 @@ class FuzzerTemplateSimple:
         return ["#include <assert.h>"]
 
     def get_ret_type(self):
-        return insn_info[self.insn.insn]['ret_type']
+        t = insn_info[self.insn.insn]['output_types']
+        assert len(t) == 1
+        return ty_conv[t[0]]
 
     def get_ret_check(self, rv_orig, rv_mut):
         rty = self.get_ret_type()
@@ -31,14 +33,8 @@ class FuzzerTemplateSimple:
             raise NotImplementedError(f"Checks for return type not implemented: {rty}")
 
     def get_param_types(self):
-        return insn_info[self.insn.insn]['params']
-
-        assert len(ret) == 2, ret
-        call_args = ", ".join(args)
-        out.append(f"  {ret[0]} = {self.insn.insn_fn}({call_args});")
-        out.append(f"  {ret[1]} = {self.mutated_fn}({call_args});")
-
-        out.append(f"  assert({self.get_ret_check(ret[0], ret[1])});")
+        t = insn_info[self.insn.insn]['arg_types']
+        return [ty_conv[tt] for tt in t]
 
     def get_template(self):
         out = []
@@ -172,7 +168,7 @@ class FuzzerBuilder:
             f.write(tmpl.get_template())
 
         with open(odir / "struct_info.txt", "w") as f:
-            ptypes = insn_info[self.insn.insn]['params']
+            ptypes = tmpl.get_param_types()
             struct_fmt = "".join([ty_helpers[pty].struct_unpacker() for pty in ptypes])
             f.write(struct_fmt)
 

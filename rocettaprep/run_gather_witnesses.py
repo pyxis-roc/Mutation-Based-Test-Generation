@@ -133,6 +133,9 @@ class CBMCOutput:
             elif status["cProverStatus"] == "success":
                 return None
         else:
+            if status.get('messageText', '') == 'CONVERSION ERROR':
+                return None
+
             assert False, f"{ofile}:cProverStatus not found in status: {status}"
 
 def run_gather_witnesses(wp, insn, experiment):
@@ -148,7 +151,9 @@ def run_gather_witnesses(wp, insn, experiment):
     outputs = {}
     for p in failed_mutants:
         mutsrc = workdir / "eqchk" / p
-        inputs, out = info.get_inputs(insn, mutsrc)
+        inputs_out = info.get_inputs(insn, mutsrc)
+        if inputs_out is None: continue
+        inputs, out = inputs_out
         if inputs in outputs:
              if not all([x1 == x2 for x1, x2 in zip(outputs[inputs], out)]):
                  # happens for sqrt, keep the first one

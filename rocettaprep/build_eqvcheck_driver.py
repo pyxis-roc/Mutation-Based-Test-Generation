@@ -41,7 +41,9 @@ class EqvCheckBuilder:
             f.write("\n".join(tmpl.get_decls()))
             f.write(tmpl.get_template())
 
-    def process_mutfile(self, mutfile):
+    def process_mutfile_2(self, mutfile):
+        # original version that parses stuff, but breaks for some features
+
         ps = PTXSemantics(mutfile, self.include_dirs + [self.rootdir / 'ptxc_fake_includes',
                                                         self.csemantics.parent])
         ps.parse()
@@ -49,6 +51,21 @@ class EqvCheckBuilder:
 
         # TODO: rename function via AST rewrite
         code = ps.get_func_code(self.insn.insn_fn)
+        code = code.replace(self.insn.insn_fn, "mutated_fn") # should really do a AST rewrite!
+
+        dst = self.rootdir / self.insn.working_dir / "eqchk" / mutfile.name
+
+        shutil.copy(self.rootdir / self.insn.working_dir / self.insn.sem_file,
+                    dst)
+
+        with open(dst, "a") as f:
+            f.write(code)
+            f.write(f"\n#include \"{self.insn.test_file}\"")
+
+    def process_mutfile(self, mutfile):
+        with open(mutfile, "r") as f:
+            code = "".join([l for l in f if not l.startswith('#include')])
+
         code = code.replace(self.insn.insn_fn, "mutated_fn") # should really do a AST rewrite!
 
         dst = self.rootdir / self.insn.working_dir / "eqchk" / mutfile.name

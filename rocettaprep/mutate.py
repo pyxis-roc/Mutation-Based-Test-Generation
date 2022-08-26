@@ -54,6 +54,11 @@ class MUSICMutator:
             # TODO: move this to use wp.include_dirs?
             cmd.extend(["-I", self.csemantics.parent])
 
+            # this causes a ton of warnings, but also does not prevent the substitution of _Generic
+            # in the code (SMVB?)
+            # so disabled.
+            #cmd.append("-DPYCPARSER")
+
         logging.debug(f"Mutate command {' '.join([str(c) for c in cmd])}")
         print(f"Mutate command {' '.join([str(c) for c in cmd])}")
         subprocess.run(cmd, check=True)

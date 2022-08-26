@@ -4,40 +4,12 @@
 #
 # Code templates for equivalence checks.
 
-# TODO: pull this from the PTX semantics database?
-insn_info = {
-    'add_rm_ftz_f32': {'ret_type': 'float',
-                       'params': ('float', 'float')},
-    'abs_f32': {'ret_type': 'float',
-                'params': ('float',)},
-    'add_rm_ftz_sat_f32': {'ret_type': 'float',
-                           'params': ('float', 'float')},
-    'add_rn_f32': {'ret_type': 'float',
-                   'params': ('float', 'float')},
-    'add_sat_f32': {'ret_type': 'float',
-                    'params': ('float', 'float')},
-    'set_eq_ftz_s32_f32': {'ret_type': 'int32_t',
-                           'params': ('float', 'float')},
-    'set_ge_f32_f32': {'ret_type': 'float',
-                       'params': ('float', 'float')},
-    'set_gt_s32_f32': {'ret_type': 'int32_t',
-                       'params': ('float', 'float')},
-    'set_gt_u32_f32': {'ret_type': 'uint32_t',
-                       'params': ('float', 'float')},
-    'setp_ge_f32': {'ret_type': 'unsigned int',
-                    'params': ('float', 'float')},
-    'sqrt_rm_f32': {'ret_type': 'float',
-                    'params': ('float', )},
-    'sub_rn_ftz_sat_f32': {'ret_type': 'float',
-                           'params': ('float', 'float')},
-    'sub_rz_ftz_sat_f32': {'ret_type': 'float',
-                           'params': ('float', 'float')},
-    'abs_s32': {'ret_type': 'int32_t',
-                'params': ('int32_t',)},
-    'add_u32': {'ret_type': 'uint32_t',
-                'params': ('uint32_t', 'uint32_t')},
-    }
+from insninfo import insn_info
 
+ty_conv = {'u32': 'uint32_t',
+           'f32': 'float',
+           's32': 'int32_t',
+           'pred': 'unsigned int'}
 
 class TyHelper:
     def __init__(self, tyname):
@@ -90,10 +62,13 @@ class EqvCheckTemplate:
         return [tyh.nondet_fn_decl()]
 
     def get_ret_type(self):
-        return insn_info[self.insn.insn]['ret_type']
+        ty = insn_info[self.insn.insn]['output_types']
+        assert len(ty) == 1
+        return ty_conv[ty[0]]
 
     def get_param_types(self):
-        return insn_info[self.insn.insn]['params']
+        ty = insn_info[self.insn.insn]['arg_types']
+        return [ty_conv[t] for t in ty]
 
     def get_param_init(self, param_names):
         out = []

@@ -16,6 +16,7 @@ from mutate import MUSICHelper, get_mutation_helper, get_mutators
 import itertools
 import os
 import json
+import sys
 
 class FuzzerExecutor:
     def __init__(self, wp, experiment):
@@ -29,9 +30,14 @@ class FuzzerExecutor:
         cmd = [str(mutant), f"-exact_artifact_path={odir}"]
 
         print(" ".join(cmd))
-        r = subprocess.run(cmd)
-        print(r.returncode)
-        #return r.returncode == 0
+        try:
+            r = subprocess.run(cmd)
+            print(r.returncode)
+        except FileNotFoundError:
+            print("ERROR: {mutant} does not exist.", file=sys.stderr)
+            return None
+
+        return False
 
 def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 'simple'):
     tt = InsnTest(wp, insn)
@@ -56,7 +62,7 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
     for p in run_on:
         mutsrc = workdir / f"libfuzzer_{fuzzer}" / p
         res = executor.run(insn, mutsrc)
-        if not res:
+        if not (res is None) and not res:
             results.append(p)
 
     with open(workdir / f"libfuzzer_{fuzzer}_results.{experiment}.json", "w") as f:

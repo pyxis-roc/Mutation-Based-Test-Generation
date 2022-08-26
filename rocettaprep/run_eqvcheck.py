@@ -54,6 +54,7 @@ def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False):
     for p in run_on:
         mutsrc = workdir / "eqchk" / p
         res = executor.run(insn, mutsrc)
+        #TODO: distinguish between parse errors and semantic errors
         if not res:
             results.append(p)
 
