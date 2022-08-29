@@ -14,14 +14,18 @@ import json
 import subprocess
 from mutate import MUSICHelper, get_mutation_helper, get_mutators
 
-def compare(wp, insn, test_info):
-    output_file = test_info.tmp_output.get_name()
-    gold_file = wp.workdir / insn.working_dir / "outputs" / test_info.gold_output.name
-
-    r = subprocess.run(['diff', '-q', str(output_file), str(gold_file)])
-    return r.returncode == 0
+from mutate import get_mutation_helper, get_mutators
+from parsl.app.app import python_app
+import parsl
 
 def run_single_test(wp, insn, test_info):
+    def compare(wp, insn, test_info):
+        output_file = test_info.tmp_output.get_name()
+        gold_file = wp.workdir / insn.working_dir / "outputs" / test_info.gold_output.name
+
+        r = subprocess.run(['diff', '-q', str(output_file), str(gold_file)])
+        return r.returncode == 0
+
     cmdline = [x if not isinstance(x, TempFile) else x.get_name() for x in test_info.cmdline]
 
     try:
@@ -33,12 +37,31 @@ def run_single_test(wp, insn, test_info):
         # missing binaries should be handled differently?
         return False
 
+@python_app
+def run_tests_on_mutant(wp, insn, mut, tt, muthelper, filter_fn):
+    workdir = wp.workdir / insn.working_dir
+
+    for test in tt.gen_tests(binary = workdir / muthelper.srcdir / mut['target'],
+                             filter_fn = filter_fn):
+
+        res = run_single_test(wp, insn, test)
+
+        for x in test.cmdline:
+            if isinstance(x, TempFile): x.cleanup()
+
+        if not res: break
+    else:
+        # mutant survived tests
+        return mut['src']
+
+    # mutant was killed
+    return None
+
 def run_tests(wp, insn, muthelper, experiment, round2 = False, r2source = 'eqvcheck'):
     tt = InsnTest(wp, insn)
     tt.load_tests()
 
     workdir = wp.workdir / insn.working_dir
-
     mutants = muthelper.get_mutants(insn)
 
     if round2:
@@ -62,24 +85,15 @@ def run_tests(wp, insn, muthelper, experiment, round2 = False, r2source = 'eqvch
 
     out = []
     for mut in mutants:
-        for test in tt.gen_tests(binary = workdir / mut['target'],
-                                 filter_fn = filter_fn):
-            print(test)
-            res = run_single_test(wp, insn, test)
+        res = run_tests_on_mutant(wp, insn, mut, tt, muthelper, filter_fn)
+        out.append(res)
 
-            #if res:
-            for x in test.cmdline:
-                if isinstance(x, TempFile): x.cleanup()
-
-            if not res: break
-        else:
-            # mutant survived tests
-            out.append(mut['src'])
-
+    out = list(filter(lambda x: x is not None, [x.result() for x in out]))
     return out
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
+    from parsl.configs.local_threads import config
 
     p = argparse.ArgumentParser(description="Run tests on mutants")
 
@@ -92,6 +106,8 @@ if __name__ == "__main__":
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
+
+    parsl.load(config)
 
     if len(insns):
         wp = WorkParams.load_from(args.workdir)

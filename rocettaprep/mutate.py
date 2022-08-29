@@ -63,7 +63,10 @@ class MUSICMutator:
 
         logging.debug(f"Mutate command {' '.join([str(c) for c in cmd])}")
         print(f"Mutate command {' '.join([str(c) for c in cmd])}")
-        subprocess.run(cmd, check=True)
+
+        with open(odir / "MUSIC.output.txt", "w") as outf:
+            with open(odir / "MUSIC.errors.txt", "w") as errf:
+                subprocess.run(cmd, check=True, stdout=outf, stderr=errf)
 
     def _get_mutated_sources(self, odir, insn):
         n = Path(insn.sem_file).stem + '_mut_db.csv'
@@ -87,7 +90,7 @@ class MUSICMutator:
 
         out = []
 
-        with open(odir.parent / "Makefile.music", "w") as f:
+        with open(odir / "Makefile", "w") as f:
             all_targets = " ".join([s[:-2] for s in srcs])
             f.write("CFLAGS ?= -g -O3\n\n")
             f.write(f"all: {all_targets}\n\n")
@@ -96,7 +99,7 @@ class MUSICMutator:
                 target = s[:-2] # remove .c
                 srcs = [str(odir / s)]
                 f.write(f"{target}: {' '.join(srcs)}\n\t")
-                cmds = p.get_compile_command_primitive(str(odir / s), insn.test_file,
+                cmds = p.get_compile_command_primitive(s, "../" + insn.test_file,
                                                        target, cflags=["${CFLAGS}"])
 
                 out.append({'src': str(s), 'target': target})
