@@ -14,6 +14,8 @@ import csv
 import json
 import logging
 from rocprepcommon import *
+from parsl.app.app import python_app
+import parsl
 
 logger = logging.getLogger(__name__)
 
@@ -151,8 +153,14 @@ def get_mutation_helper(mutator, wp):
 def get_mutators():
     return ["MUSIC"]
 
+@python_app
+def run_mutator(mut, i):
+    mut.generate_mutations(i)
+    mut.generate_mutation_makefile(i)
+
 if __name__ == "__main__":
     from setup_workdir import WorkParams
+    from parsl.configs.local_threads import config
 
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
     p.add_argument("workdir", help="Work directory")
@@ -163,12 +171,16 @@ if __name__ == "__main__":
     args = p.parse_args()
     wp = WorkParams.load_from(args.workdir)
 
+    parsl.load(config)
+
     if args.mutator == "MUSIC":
         mut = MUSICMutator(wp.csemantics, wp.workdir, music_executable = args.music)
     else:
         raise NotImplementedError(f"Do not support mutator {args.mutator}")
 
+    out = []
     for insn in get_instructions(args.insn):
         i = Insn(insn)
-        mut.generate_mutations(i)
-        mut.generate_mutation_makefile(i)
+        out.append(run_mutator(mut, i))
+
+    for x in out: x.result()

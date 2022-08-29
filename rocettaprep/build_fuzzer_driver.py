@@ -7,6 +7,9 @@ from eqvcheck_templates import insn_info, ty_helpers, ty_conv
 from mutate import get_mutation_helper, get_mutators
 import shutil
 from build_single_insn import PTXSemantics
+from parsl.app.app import python_app
+import parsl
+import sys
 
 class FuzzerTemplateSimple:
     """Fuzzer template for simple scheme where we rely on the fuzzer to do
@@ -145,7 +148,6 @@ class FuzzerBuilder:
         self.insn = insn
         self.muthelper = muthelper
         self.template = template
-        print(self.template)
 
     def setup(self):
         # testfile = self.wp.workdir / self.insn.working_dir / self.insn.test_file
@@ -221,22 +223,37 @@ class FuzzerBuilder:
                                      for c in cmds]))
                 f.write("\n\n")
 
+@python_app
+def run_process_mutfile(fb, mutsrc):
+    fb.process_mutfile(mutsrc)
 
-def build_fuzzer_driver(wp, insn, muthelper, setup_only = False, fuzzer = 'simple'):
+    return mutsrc
+
+def build_fuzzer_driver(wp, insn, muthelper, setup_only = False, fuzzer = 'simple', parallel = True):
     mutants = muthelper.get_mutants(insn)
     mutsrcs = [wp.workdir / insn.working_dir / muthelper.srcdir / x['src'] for x in mutants]
 
     fb = FuzzerBuilder(wp, insn, muthelper, template=fuzzer)
     fb.setup()
     if not setup_only:
+        out = []
         for s in mutsrcs:
-            fb.process_mutfile(s)
+            if parallel:
+                out.append(run_process_mutfile(fb, s))
+            else:
+                print(s, file=sys.stderr)
+                fb.process_mutfile(s)
+
+        if parallel:
+            for x in out:
+                print(x.result(), file=sys.stderr)
 
         fb.generate_fuzzer_makefile()
 
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
+    from parsl.configs.local_threads import config
 
     p = argparse.ArgumentParser(description="Generate LLVM fuzzer drivers")
     p.add_argument("workdir", help="Work directory")
@@ -244,12 +261,15 @@ if __name__ == "__main__":
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--driver-only", action="store_true", help="Only generate the driver")
     p.add_argument("--fuzzer", choices=['simple', 'custom'], default='simple')
+    p.add_argument("--np", dest='no_parallel', help="Process serially", action="store_true")
 
     args = p.parse_args()
     wp = WorkParams.load_from(args.workdir)
     muthelper = get_mutation_helper(args.mutator, wp)
 
+    parsl.load(config)
+
     for insn in get_instructions(args.insn):
-        print(insn)
+        print(insn, file=sys.stderr)
         i = Insn(insn)
-        build_fuzzer_driver(wp, i, muthelper, setup_only = args.driver_only, fuzzer = args.fuzzer)
+        build_fuzzer_driver(wp, i, muthelper, setup_only = args.driver_only, fuzzer = args.fuzzer, parallel = not args.no_parallel)

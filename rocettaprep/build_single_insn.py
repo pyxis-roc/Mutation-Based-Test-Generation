@@ -17,6 +17,9 @@ from collections import OrderedDict
 import shutil
 import logging
 from rocprepcommon import *
+from parsl.app.app import python_app
+import parsl
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +200,7 @@ class Insn:
 
             return start, end
 
+@python_app
 def gen_insn_oracle(insn, oroot, p):
     insn = Insn(insn)
 
@@ -219,6 +223,7 @@ def gen_insn_oracle(insn, oroot, p):
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
+    from parsl.configs.local_threads import config
 
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
     p.add_argument("workdir", help="Work directory")
@@ -226,6 +231,8 @@ if __name__ == "__main__":
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
+
+    parsl.load(config)
 
     if len(insns):
         wp = WorkParams.load_from(args.workdir)
@@ -237,7 +244,11 @@ if __name__ == "__main__":
 
         oroot = Path(args.workdir)
 
+        out = []
         for insn in insns:
-            gen_insn_oracle(insn, oroot, p)
+            out.append(gen_insn_oracle(insn, oroot, p))
+
+        for x in out:
+            x.result()
 
     print(f"{len(insns)} instructions processed.")

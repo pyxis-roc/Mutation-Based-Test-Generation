@@ -17,11 +17,8 @@ from eqvcheck_templates import EqvCheckTemplate
 from rocprepcommon import *
 from mutate import get_mutation_helper, get_mutators
 from parsl.app.app import python_app
-from parsl.configs.local_threads import config
 import parsl
 import sys
-
-parsl.load(config)
 
 class EqvCheckBuilder:
     def __init__(self, csemantics, rootdir, insn, include_dirs = None):
@@ -110,6 +107,7 @@ def build_eqvcheck_driver(csemantics, rootdir, muthelper, insn, include_dirs, se
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
+    from parsl.configs.local_threads import config
 
     p = argparse.ArgumentParser(description="Build the driver for equivalence checks")
     p.add_argument("workdir", help="Root working directory")
@@ -125,6 +123,8 @@ if __name__ == "__main__":
     incl = [wp.pycparser_includes] + wp.include_dirs
 
     # we process each instruction serially, which is fine, since each instruction has many mutants.
+
+    parsl.load(config)
 
     for insn in get_instructions(args.insn):
         print(insn, file=sys.stderr)
