@@ -18,6 +18,10 @@ import os
 import json
 import sys
 
+from parsl.app.app import python_app
+import parsl
+
+
 class FuzzerExecutor:
     def __init__(self, wp, experiment):
         self.wp = wp
@@ -39,7 +43,11 @@ class FuzzerExecutor:
 
         return False
 
-def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 'simple'):
+@python_app
+def run_fuzzer_on_mutant(executor, insn, mutsrc):
+    return executor.run(insn, mutsrc)
+
+def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 'simple', parallel = True):
     tt = InsnTest(wp, insn)
 
     workdir = wp.workdir / insn.working_dir
@@ -53,15 +61,29 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
         not_equivalent = set(json.load(fp=f))
 
     if all_mutants:
-        run_on = [x['target'] for x in mutants and x['src'] in not_equivalent]
+        # we still restrict this to non-equivalent mutants?
+        run_on = [x['target'] for x in mutants if x['src'] in not_equivalent]
     else:
         survivors = set(survivors)
         run_on = [x['target'] for x in mutants if x['src'] in survivors and x['src'] in not_equivalent]
 
-    results = []
+    out = []
     for p in run_on:
         mutsrc = workdir / f"libfuzzer_{fuzzer}" / p
-        res = executor.run(insn, mutsrc)
+
+        if parallel:
+            out.append((p, run_fuzzer_on_mutant(executor, insn, mutsrc)))
+        else:
+            out.append((p, executor.run(insn, mutsrc)))
+
+
+    results = []
+    for p, r in out:
+        if parallel:
+            res = r.result()
+        else:
+            res = r
+
         if not (res is None) and not res:
             results.append(p)
 
@@ -70,6 +92,7 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
+    from parsl.configs.local_threads import config
 
     p = argparse.ArgumentParser(description="Run fuzzer on mutants")
 
@@ -77,12 +100,16 @@ if __name__ == "__main__":
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
-    p.add_argument("--all", help="Run the fuzzer on all mutants, not just survivors", action="store_true")
+    p.add_argument("--all", help="Run the fuzzer on all mutants, not just survivors (NOT RECOMMENDED)", action="store_true")
     p.add_argument("--fuzzer", help="Choose variant of fuzzer to run",
                    choices=['simple', 'custom'], default='simple')
 
+    p.add_argument("--np", dest='no_parallel', help="Process serially", action="store_true")
+
     args = p.parse_args()
     insns = get_instructions(args.insn)
+
+    parsl.load(config)
 
     if len(insns):
         wp = WorkParams.load_from(args.workdir)
@@ -90,5 +117,5 @@ if __name__ == "__main__":
 
         for i in insns:
             insn = Insn(i)
-            run_fuzzer(wp, insn, args.experiment, muthelper, all_mutants = args.all, fuzzer=args.fuzzer)
+            run_fuzzer(wp, insn, args.experiment, muthelper, all_mutants = args.all, fuzzer=args.fuzzer, parallel = args.no_parallel)
 
