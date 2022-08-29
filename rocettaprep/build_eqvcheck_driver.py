@@ -16,6 +16,12 @@ import shutil
 from eqvcheck_templates import EqvCheckTemplate
 from rocprepcommon import *
 from mutate import get_mutation_helper, get_mutators
+from parsl.app.app import python_app
+from parsl.configs.local_threads import config
+import parsl
+import sys
+
+parsl.load(config)
 
 class EqvCheckBuilder:
     def __init__(self, csemantics, rootdir, insn, include_dirs = None):
@@ -77,7 +83,12 @@ class EqvCheckBuilder:
             f.write(code)
             f.write(f"\n#include \"{self.insn.test_file}\"")
 
-def build_eqvcheck_driver(csemantics, rootdir, muthelper, insn, include_dirs, setup_only = False):
+@python_app
+def run_process_mutfile(ecb, mutsrc):
+    ecb.process_file(mutsrc)
+    return mutsrc
+
+def build_eqvcheck_driver(csemantics, rootdir, muthelper, insn, include_dirs, setup_only = False, parallel = True):
     mutants = muthelper.get_mutants(insn)
     mutsrcs = [rootdir / insn.working_dir / muthelper.srcdir / x['src'] for x in mutants]
 
@@ -85,11 +96,17 @@ def build_eqvcheck_driver(csemantics, rootdir, muthelper, insn, include_dirs, se
     ecb = EqvCheckBuilder(csemantics, rootdir, insn, include_dirs)
     ecb.setup()
     if not setup_only:
+        out = []
         for s in mutsrcs:
-            print(s)
-            ecb.process_mutfile(s)
+            if parallel:
+                out.append(run_process_mutfile(ecb, s))
+            else:
+                print(s, file=sys.stderr)
+                ecb.process_mutfile(s)
 
-    #print(mutsrcs)
+        if parallel:
+            for x in out:
+                print(x.result(), file=sys.stderr)
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
@@ -99,6 +116,7 @@ if __name__ == "__main__":
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--driver-only", action="store_true", help="Only generate the driver")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
+    p.add_argument("--np", dest='no_parallel', help="Process serially", action="store_true")
 
     args = p.parse_args()
     wp = WorkParams.load_from(args.workdir)
@@ -106,7 +124,9 @@ if __name__ == "__main__":
 
     incl = [wp.pycparser_includes] + wp.include_dirs
 
+    # we process each instruction serially, which is fine, since each instruction has many mutants.
+
     for insn in get_instructions(args.insn):
-        print(insn)
+        print(insn, file=sys.stderr)
         i = Insn(insn)
-        build_eqvcheck_driver(wp.csemantics, wp.workdir, muthelper, i, incl, args.driver_only)
+        build_eqvcheck_driver(wp.csemantics, wp.workdir, muthelper, i, incl, args.driver_only, parallel=args.no_parallel)
