@@ -5,6 +5,7 @@ import json
 from rocprepcommon import *
 from build_single_insn import Insn
 from mutate import get_mutation_helper, get_mutators
+import polars as pl
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
@@ -28,7 +29,8 @@ if __name__ == "__main__":
             mutants = muthelper.get_mutants(insn)
             survivors = muthelper.get_survivors(insn, args.experiment)
 
-            out[i] = {'survivors': len(survivors), 'mutants': len(mutants)}
+            out[i] = {'instruction': i,
+                      'survivors': len(survivors), 'mutants': len(mutants)}
 
             try:
                 for r2source in ['eqvcheck', 'fuzzer_simple', 'fuzzer_custom']:
@@ -44,5 +46,7 @@ if __name__ == "__main__":
 
             out[i][f'noneq_mutants'] = len(noneq_mutants)
 
-        print(out)
-
+        df = pl.from_dicts(list(out.values()))
+        df.write_csv(f"stats_{args.experiment}.csv")
+    else:
+        print(f"WARNING: No instructions specified, use --insn")
