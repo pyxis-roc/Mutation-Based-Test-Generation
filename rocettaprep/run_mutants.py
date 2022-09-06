@@ -93,7 +93,7 @@ def run_tests(wp, insn, muthelper, experiment, round2 = False, r2source = 'eqvch
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
-    from parsl.configs.local_threads import config
+    from runconfig import config
 
     p = argparse.ArgumentParser(description="Run tests on mutants")
 

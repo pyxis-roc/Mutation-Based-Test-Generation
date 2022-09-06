@@ -223,7 +223,7 @@ def gen_insn_oracle(insn, oroot, p):
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
-    from parsl.configs.local_threads import config
+    from runconfig import config
 
     p = argparse.ArgumentParser(description="Generate single instruction tests from the C semantics")
     p.add_argument("workdir", help="Work directory")

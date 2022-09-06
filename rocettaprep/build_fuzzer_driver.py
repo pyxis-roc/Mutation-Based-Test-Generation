@@ -185,6 +185,8 @@ class FuzzerBuilder:
         # TODO: add decls for kill and pid
         shutil.copy(src, dst)
 
+        return dst
+
     def generate_fuzzer_makefile(self):
         def clang_compiler(srcfiles, obj, cflags, libs):
             cmd = ["clang-13"] # clang-12 should also work?
@@ -225,9 +227,8 @@ class FuzzerBuilder:
 
 @python_app
 def run_process_mutfile(fb, mutsrc):
-    fb.process_mutfile(mutsrc)
-
-    return mutsrc
+    dst = fb.process_mutfile(mutsrc)
+    return dst
 
 def build_fuzzer_driver(wp, insn, muthelper, setup_only = False, fuzzer = 'simple', parallel = True):
     mutants = muthelper.get_mutants(insn)
@@ -241,8 +242,7 @@ def build_fuzzer_driver(wp, insn, muthelper, setup_only = False, fuzzer = 'simpl
             if parallel:
                 out.append(run_process_mutfile(fb, s))
             else:
-                print(s, file=sys.stderr)
-                fb.process_mutfile(s)
+                print(fb.process_mutfile(s), file=sys.stderr)
 
         if parallel:
             for x in out:
@@ -253,7 +253,7 @@ def build_fuzzer_driver(wp, insn, muthelper, setup_only = False, fuzzer = 'simpl
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
-    from parsl.configs.local_threads import config
+    from runconfig import config
 
     p = argparse.ArgumentParser(description="Generate LLVM fuzzer drivers")
     p.add_argument("workdir", help="Work directory")

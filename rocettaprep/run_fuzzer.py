@@ -92,7 +92,7 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
-    from parsl.configs.local_threads import config
+    from runconfig import config
 
     p = argparse.ArgumentParser(description="Run fuzzer on mutants")
 

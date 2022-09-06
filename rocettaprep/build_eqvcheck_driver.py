@@ -80,10 +80,12 @@ class EqvCheckBuilder:
             f.write(code)
             f.write(f"\n#include \"{self.insn.test_file}\"")
 
+        return dst
+
 @python_app
 def run_process_mutfile(ecb, mutsrc):
     ecb.process_file(mutsrc)
-    return mutsrc
+    return dst
 
 def build_eqvcheck_driver(csemantics, rootdir, muthelper, insn, include_dirs, setup_only = False, parallel = True):
     mutants = muthelper.get_mutants(insn)
@@ -98,8 +100,7 @@ def build_eqvcheck_driver(csemantics, rootdir, muthelper, insn, include_dirs, se
             if parallel:
                 out.append(run_process_mutfile(ecb, s))
             else:
-                print(s, file=sys.stderr)
-                ecb.process_mutfile(s)
+                print(ecb.process_mutfile(s), file=sys.stderr)
 
         if parallel:
             for x in out:
@@ -107,7 +108,7 @@ def build_eqvcheck_driver(csemantics, rootdir, muthelper, insn, include_dirs, se
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
-    from parsl.configs.local_threads import config
+    from runconfig import config
 
     p = argparse.ArgumentParser(description="Build the driver for equivalence checks")
     p.add_argument("workdir", help="Root working directory")

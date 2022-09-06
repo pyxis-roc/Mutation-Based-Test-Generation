@@ -89,7 +89,7 @@ def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
-    from parsl.configs.local_threads import config
+    from runconfig import config
 
     p = argparse.ArgumentParser(description="Run equivalence tests on mutants")
 
