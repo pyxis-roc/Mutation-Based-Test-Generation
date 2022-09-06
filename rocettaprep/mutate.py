@@ -16,6 +16,7 @@ import logging
 from rocprepcommon import *
 from parsl.app.app import python_app
 import parsl
+import runcommon
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,9 @@ class MUSICMutator:
 
         with open(odir / "MUSIC.output.txt", "w") as outf:
             with open(odir / "MUSIC.errors.txt", "w") as errf:
-                subprocess.run(cmd, check=True, stdout=outf, stderr=errf)
+                #subprocess.run(cmd, check=True, stdout=outf, stderr=errf)
+                _, time = runcommon.run_and_time(cmd, check=True, stdout=outf, stderr=errf)
+                print(f"Mutation of {insn} took {time/1E6} ms")
 
     def _get_mutated_sources(self, odir, insn):
         n = Path(insn.sem_file).stem + '_mut_db.csv'
