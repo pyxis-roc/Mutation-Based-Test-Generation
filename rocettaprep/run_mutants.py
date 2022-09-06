@@ -17,6 +17,7 @@ from mutate import MUSICHelper, get_mutation_helper, get_mutators
 from mutate import get_mutation_helper, get_mutators
 from parsl.app.app import python_app
 import parsl
+import runcommon
 
 def run_single_test(wp, insn, test_info):
     def compare(wp, insn, test_info):
@@ -29,7 +30,9 @@ def run_single_test(wp, insn, test_info):
     cmdline = [x if not isinstance(x, TempFile) else x.get_name() for x in test_info.cmdline]
 
     try:
-        r = subprocess.run(cmdline, check=True)
+        #r = subprocess.run(cmdline, check=True)
+        r, time_ns = runcommon.run_and_time(cmdline, check=True)
+        print(f"{insn.insn}:{test_info.cmdline[1]}: took {time_ns / 1E6} ms")
         return compare(wp, insn, test_info)
     except subprocess.CalledProcessError:
         return False
