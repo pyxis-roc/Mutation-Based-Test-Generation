@@ -47,7 +47,7 @@ class CBMCExecutor:
         h = os.open(ofile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o666)
         print(" ".join(cmd))
         r, t = run_and_time(cmd, stdout=h) # TODO: add timeout
-        print(f"{mutant}:{self.experiment}: Equivalence checker took {t/1E6} ms, retcode={r.returncode}")
+        print(f"{mutant}:{self.experiment}: Equivalence checker took {t/1E6} ms, retcode={r.returncode}", file=sys.stderr)
         os.close(h)
         return r.returncode
 
