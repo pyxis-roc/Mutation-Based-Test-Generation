@@ -33,11 +33,9 @@ if __name__ == "__main__":
                     print(f)
                     with open(f, "r") as fp:
                         d = json.load(fp=fp)
-                        print(d)
                         out.append(d)
 
         if len(out):
-            print(out)
             df = pl.from_dicts(out)
 
             if args.output:
