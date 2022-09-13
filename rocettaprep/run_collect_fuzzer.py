@@ -20,6 +20,7 @@ import struct
 import sys
 from run_gather_witnesses import float_hex2
 from roctest import InsnTest, TempFile
+import time
 
 class FuzzerOutput:
     def __init__(self, wp, experiment):
@@ -58,7 +59,7 @@ class FuzzerOutput:
         with open(ofile, "rb") as f:
             data = f.read()
             if len(data) == 0:
-                print(f"WARNING: {ofile} is 0-byte, most likely the fuzzer crashed due to non-input reasons")
+                print(f"WARNING: {ofile} is 0-byte, most likely the fuzzer crashed due to non-input reasons", file=sys.stderr)
                 return None
 
             unpacked_data = struct.unpack(struct_fmt, data)
@@ -76,11 +77,19 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple'):
     info = FuzzerOutput(wp, experiment)
 
     output_inputs = set() # confusing .., used for deduplication
+    totalgen = 0
+    duplicates = 0
     for p in mutants:
         mutsrc = workdir / f"libfuzzer_{fuzzer}" / p['target']
         inputs = info.get_inputs(insn, mutsrc)
-        if inputs is not None and inputs not in output_inputs:
-            output_inputs.add(inputs)
+        if inputs is not None:
+            totalgen += 1
+            if inputs not in output_inputs:
+                output_inputs.add(inputs)
+            else:
+                duplicates += 1
+
+    print(f"{insn.insn}:{experiment}:{fuzzer}: Fuzzer generated {totalgen} inputs, {totalgen-duplicates} unique.")
 
     if len(output_inputs) == 0:
         return
@@ -112,6 +121,7 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple'):
     it = InsnTest(wp, insn)
     it.set_insn_info(testcases)
 
+    print(f"{insn.insn}:{experiment}:{fuzzer}: Regenerating outputs for fuzzer inputs", file=sys.stderr)
     # always regenerate everything
     for t in it.gen_tests(filter_fn=lambda x: x[1]['source'] == f'libfuzzer_{fuzzer}.{experiment}',
                           output_fn = lambda ndx, tc, insn: TempFile(path=tc['output'])):
@@ -139,5 +149,7 @@ if __name__ == "__main__":
 
         for i in insns:
             insn = Insn(i)
+            start = time.monotonic_ns()
             run_gather_fuzzer(wp, insn, args.experiment, muthelper, fuzzer = args.fuzzer)
-
+            end = time.monotonic_ns()
+            print(f"{insn.insn}:{args.experiment}:{args.fuzzer}: Gathering inputs took {(end - start)/1E6} ms", file=sys.stderr)
