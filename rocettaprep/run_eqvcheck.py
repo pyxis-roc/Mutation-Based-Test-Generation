@@ -47,9 +47,13 @@ class CBMCExecutor:
         h = os.open(ofile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o666)
         print(" ".join(cmd))
         r, t = run_and_time(cmd, stdout=h) # TODO: add timeout
-        print(f"{insn.insn}:{mutant}:{self.experiment}: Equivalence checker took {t/1E6} ms, retcode={r.returncode}", file=sys.stderr)
+        if t is not None:
+            print(f"{insn.insn}:{mutant}:{self.experiment}: Equivalence checker took {t/1E6} ms, retcode={r.returncode}", file=sys.stderr)
+        else:
+            print(f"{insn.insn}:{mutant}:{self.experiment}: Equivalence checker timed out, retcode={r.returncode}", file=sys.stderr)
+
         os.close(h)
-        return r.returncode
+        return {'time_ns': t, 'retcode': r.returncode}
 
 @python_app
 def run_cbmc(cbmc, insn, mutsrc):
@@ -78,20 +82,23 @@ def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel
         else:
             out.append((p, executor.run(insn, mutsrc)))
 
-    # TODO: distinguish conversion errors
     if parallel:
-        #TODO: handle timeouts
-        results = [x for x, y in out if y.result() == CBMC_RC_VERIFICATION_UNSAFE]
-    else:
-        results = [x for x, y in out if y == CBMC_RC_VERIFICATION_UNSAFE]
+        out = [(x, y.result()) for x, y in out]
+
+    results = [x for x, y in out if y['retcode'] == CBMC_RC_VERIFICATION_UNSAFE]
 
     if all_mutants:
         resfile = workdir / f"eqvcheck_results.all.{experiment}.json"
+        timfile = workdir / f"eqvcheck_timing.all.{experiment}.json"
     else:
         resfile = workdir / f"eqvcheck_results.{experiment}.json"
+        timfile = workdir / f"eqvcheck_timing.{experiment}.json"
 
     with open(resfile, "w") as f:
         json.dump(results, fp=f)
+
+    with open(timfile, "w") as f:
+        json.dump(dict(out), fp=f)
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
