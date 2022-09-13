@@ -20,6 +20,11 @@ import json
 from parsl.app.app import python_app
 import parsl
 
+from runcommon import run_and_time
+
+import sys
+import time
+
 # https://github.com/diffblue/cbmc/blob/48893287099cb5780302fe9dc415eb6888354fd6/src/util/exit_codes.h
 
 CBMC_RC_OK = 0
@@ -41,7 +46,8 @@ class CBMCExecutor:
         cmd.append(str(mutant))
         h = os.open(ofile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o666)
         print(" ".join(cmd))
-        r = subprocess.run(cmd, stdout=h)
+        r, t = run_and_time(cmd, stdout=h) # TODO: add timeout
+        print(f"{mutant}:{self.experiment}: Equivalence checker took {t/1E6} ms, retcode={r.returncode}")
         os.close(h)
         return r.returncode
 
@@ -111,5 +117,8 @@ if __name__ == "__main__":
 
         for i in insns:
             insn = Insn(i)
+            start = time.monotonic_ns()
             run_eqv_check(wp, insn, args.experiment, muthelper, all_mutants = args.all, parallel = not args.no_parallel)
+            end = time.monotonic_ns()
+            print(f"{i}:{args.experiment}: Equivalence checking took {(end - start)/1E6} ms (parallel = {not args.no_parallel})", file=sys.stderr)
 
