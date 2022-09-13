@@ -18,6 +18,7 @@ import json
 import math
 import struct
 import sys
+import time
 
 # stolen from smt2utils
 def conform_c(x):
@@ -149,18 +150,26 @@ def run_gather_witnesses(wp, insn, experiment):
     info = CBMCOutput(wp, experiment)
 
     outputs = {}
+    duplicates = 0
+    totalgen = 0
+
     for p in failed_mutants:
         mutsrc = workdir / "eqchk" / p
         inputs_out = info.get_inputs(insn, mutsrc)
         if inputs_out is None: continue
         inputs, out = inputs_out
+        totalgen += 1
         if inputs in outputs:
              if not all([x1 == x2 for x1, x2 in zip(outputs[inputs], out)]):
                  # happens for sqrt, keep the first one
-                 print(f"{insn.insn}: {p}: Duplicate input {inputs} has multiple gold outputs: {outputs[inputs]} and {out}", file=sys.stderr)
-
+                 print(f"{insn.insn}: {p}: WARNING: Duplicate input {inputs} has multiple gold outputs: {outputs[inputs]} and {out}", file=sys.stderr)
+             else:
+                 # duplicate input/output
+                 duplicates += 1
         else:
             outputs[inputs] = out
+
+    print(f"{insn.insn}: Equivalence checker generated {totalgen} witnesses with {totalgen-duplicates} unique inputs.", file=sys.stderr)
 
     inpfile = workdir / f"eqvcheck_inputs.{experiment}.ssv"
     outfile = workdir / "outputs" / f"eqvcheck_outputs.{experiment}.ssv"
@@ -205,5 +214,7 @@ if __name__ == "__main__":
 
         for i in insns:
             insn = Insn(i)
+            start = time.monotonic_ns()
             run_gather_witnesses(wp, insn, args.experiment)
-
+            end = time.monotonic_ns()
+            print(f"{insn.insn}:{args.experiment}: gathering witnesses took {(end - start) / 1E6} ms", file=sys.stderr)
