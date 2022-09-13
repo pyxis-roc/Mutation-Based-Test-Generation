@@ -128,6 +128,18 @@ class Orchestrator:
         logfile = self.logdir / f'stats_inputs.log'
         run_and_log(cmd, logfile)
 
+    def gather_timing_stats(self):
+        print(f"*** BEGINNING gather_timing_stats")
+        cmd = [str(MYPATH / 'stats_timing.py'),
+               '--insn', self.insn,
+               '-o', str(self.logdir / f'stats_timing.{self.experiment}.csv'),
+               '--os', str(self.logdir / f'stats_timing_summary.{self.experiment}.csv'),
+               self.workdir, self.experiment]
+
+        #TODO: This does not distinguish between --all runs?
+        logfile = self.logdir / f'stats_timing.log'
+        run_and_log(cmd, logfile)
+
 if __name__ == "__main__":
     from setup_workdir import WorkParams
 
@@ -150,6 +162,7 @@ if __name__ == "__main__":
 
     start = datetime.datetime.now()
     print("Started at", start)
+
     x.run_mutants()
     x.run_eqvcheck()
     x.run_fuzzer('simple', run_all = args.all)
@@ -165,6 +178,8 @@ if __name__ == "__main__":
 
     x.gather_mutant_stats()
     x.gather_input_stats()
+    x.gather_timing_stats()
+
     end = datetime.datetime.now()
     print("End at", end)
     print("Total time", end - start) # should really be monotonic.

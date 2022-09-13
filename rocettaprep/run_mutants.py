@@ -19,6 +19,8 @@ from parsl.app.app import python_app
 import parsl
 import runcommon
 
+import time
+
 def run_single_test(wp, insn, test_info):
     def compare(wp, insn, test_info):
         output_file = test_info.tmp_output.get_name()
@@ -44,6 +46,8 @@ def run_single_test(wp, insn, test_info):
 def run_tests_on_mutant(wp, insn, mut, tt, muthelper, filter_fn):
     workdir = wp.workdir / insn.working_dir
 
+    start = time.monotonic_ns()
+
     for test in tt.gen_tests(binary = workdir / muthelper.srcdir / mut['target'],
                              filter_fn = filter_fn):
 
@@ -52,13 +56,16 @@ def run_tests_on_mutant(wp, insn, mut, tt, muthelper, filter_fn):
         for x in test.cmdline:
             if isinstance(x, TempFile): x.cleanup()
 
-        if not res: break
+        if not res:
+            end = time.monotonic_ns() # ugly
+            break
     else:
         # mutant survived tests
-        return mut['src']
+        end = time.monotonic_ns()
+        return {'time_ns': end - start, 'result': mut['src']}
 
     # mutant was killed
-    return None
+    return {'time_ns': end - start, 'result': None}
 
 def run_tests(wp, insn, muthelper, experiment, round2 = False, r2source = 'eqvcheck'):
     tt = InsnTest(wp, insn)
@@ -89,10 +96,20 @@ def run_tests(wp, insn, muthelper, experiment, round2 = False, r2source = 'eqvch
     out = []
     for mut in mutants:
         res = run_tests_on_mutant(wp, insn, mut, tt, muthelper, filter_fn)
-        out.append(res)
+        out.append((mut['target'], res))
 
-    out = list(filter(lambda x: x is not None, [x.result() for x in out]))
-    return out
+    out = [(p, res.result()) for (p, res) in out]
+
+    if round2:
+        timdat = f"mutant_timing.{experiment}.{r2source}.json"
+    else:
+        timdat = f"mutant_timing.{experiment}.json"
+
+    with open(workdir / timdat, "w") as f:
+        json.dump(dict(out), fp=f)
+
+    surv = [x['result'] for _, x in out if x['result'] is not None]
+    return surv
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams

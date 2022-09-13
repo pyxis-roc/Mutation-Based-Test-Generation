@@ -58,12 +58,12 @@ class FuzzerExecutor:
             else:
                 print(f"{mutant}:{self.experiment}: Fuzzing timed out", file=sys.stderr)
 
-            return True
+            return {'time_ns': t, 'retcode': r.returncode}
         except FileNotFoundError:
             print("ERROR: {mutant} does not exist.", file=sys.stderr)
             return None
 
-        return False
+        assert False
 
 @python_app
 def run_fuzzer_on_mutant(executor, insn, mutsrc):
@@ -98,19 +98,17 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
         else:
             out.append((p, executor.run(insn, mutsrc)))
 
+    if parallel:
+        out = [(p, r.result()) for p, r in out]
 
     results = []
     for p, r in out:
-        if parallel:
-            res = r.result()
-        else:
-            res = r
+        if not (r is None):
+            results.append((p, r))
 
-        if not (res is None) and not res:
-            results.append(p)
-
+    # fuzzer doesn't have 'results' like eqvcheck?
     with open(workdir / f"libfuzzer_{fuzzer}_results.{experiment}.json", "w") as f:
-        json.dump(results, fp=f)
+        json.dump(dict(results), fp=f)
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
