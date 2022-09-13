@@ -21,11 +21,21 @@ import sys
 from parsl.app.app import python_app
 import parsl
 
+from runcommon import run_and_time
 
 class FuzzerExecutor:
     def __init__(self, wp, experiment):
         self.wp = wp
         self.experiment = experiment
+
+    def make(self, mutant_exec):
+        p = mutant_exec.parent
+        t = mutant_exec.name
+
+        print(f"{mutant_exec}: Compiling executable", file=sys.stderr)
+        r, tm = run_and_time(["make", "-C", str(p), t])
+        print(f"{mutant_exec}: Compilation took {tm/1E6} ms", file=sys.stderr)
+        return r.returncode
 
     def run(self, insn, mutant):
         # this can make running repeats painful.
@@ -33,10 +43,22 @@ class FuzzerExecutor:
 
         cmd = [str(mutant), f"-exact_artifact_path={odir}"]
 
-        print(" ".join(cmd))
+        if not mutant.exists():
+            r = self.make(mutant)
+            if not (r == 0):
+                print(f"{mutant}:ERROR: Compilation appears to have failed. Continuing anyway.",
+                      file=sys.stderr)
+
+        print(f"{mutant}: {' '.join(cmd)}", file=sys.stderr)
+
         try:
-            r = subprocess.run(cmd)
-            print(r.returncode)
+            r, t = run_and_time(cmd, timeout_s = 15)
+            if t is not None:
+                print(f"{mutant}:{self.experiment}: Total fuzzing time {t/1E6} ms, retcode = {r.returncode}", file=sys.stderr)
+            else:
+                print(f"{mutant}:{self.experiment}: Fuzzing timed out", file=sys.stderr)
+
+            return True
         except FileNotFoundError:
             print("ERROR: {mutant} does not exist.", file=sys.stderr)
             return None
