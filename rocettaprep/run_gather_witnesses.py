@@ -169,6 +169,13 @@ def run_gather_witnesses(wp, insn, experiment):
         else:
             outputs[inputs] = out
 
+    with open(workdir / "eqchk" / f"inputgen.{experiment}.json", "w") as f:
+        json.dump({'experiment': experiment,
+                   'instruction': insn.insn,
+                   'source': 'eqvcheck',
+                   'total': totalgen,
+                   'unique': totalgen - duplicates}, fp=f)
+
     print(f"{insn.insn}: Equivalence checker generated {totalgen} witnesses with {totalgen-duplicates} unique inputs.", file=sys.stderr)
 
     inpfile = workdir / f"eqvcheck_inputs.{experiment}.ssv"

@@ -89,6 +89,14 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple'):
             else:
                 duplicates += 1
 
+    # TODO: extract this out into a common lib?
+    with open(workdir / f"libfuzzer_{fuzzer}" / f"inputgen.{experiment}.json", "w") as f:
+        json.dump({'experiment': experiment,
+                   'instruction': insn.insn,
+                   'source': f'libfuzzer_{fuzzer}',
+                   'total': totalgen,
+                   'unique': totalgen - duplicates}, fp=f)
+
     print(f"{insn.insn}:{experiment}:{fuzzer}: Fuzzer generated {totalgen} inputs, {totalgen-duplicates} unique.")
 
     if len(output_inputs) == 0:

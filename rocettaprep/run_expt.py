@@ -106,15 +106,26 @@ class Orchestrator:
         logfile = self.logdir / f'collect_fuzzer.{fuzzer}.log'
         run_and_log(cmd, logfile)
 
-    def gather_stats(self):
-        print(f"*** BEGINNING gather_stats")
+    def gather_mutant_stats(self):
+        print(f"*** BEGINNING gather_mutant_stats")
         cmd = [str(MYPATH / 'stats_mutants.py'),
                '--insn', self.insn,
-               '-o', str(self.logdir / f'stats.{self.experiment}.csv'),
+               '-o', str(self.logdir / f'stats_mutants.{self.experiment}.csv'),
                self.workdir, self.experiment]
 
         #TODO: This does not distinguish between --all runs?
-        logfile = self.logdir / f'stats.log'
+        logfile = self.logdir / f'mutant_stats.log'
+        run_and_log(cmd, logfile)
+
+    def gather_input_stats(self):
+        print(f"*** BEGINNING gather_input_stats")
+        cmd = [str(MYPATH / 'stats_inputs.py'),
+               '--insn', self.insn,
+               '-o', str(self.logdir / f'stats_inputs.{self.experiment}.csv'),
+               self.workdir, self.experiment]
+
+        #TODO: This does not distinguish between --all runs?
+        logfile = self.logdir / f'stats_inputs.log'
         run_and_log(cmd, logfile)
 
 if __name__ == "__main__":
@@ -152,7 +163,8 @@ if __name__ == "__main__":
     x.run_round2('fuzzer_simple')
     x.run_round2('fuzzer_custom')
 
-    x.gather_stats()
+    x.gather_mutant_stats()
+    x.gather_input_stats()
     end = datetime.datetime.now()
     print("End at", end)
     print("Total time", end - start) # should really be monotonic.
