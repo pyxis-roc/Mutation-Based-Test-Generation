@@ -216,7 +216,7 @@ class FuzzerBuilder:
 
             for s in srcs:
                 target = s[:-2] # remove .c
-                f.write(f"{target}: {' '.join(srcs)}\n\t")
+                f.write(f"{target}: {s}\n\t")
                 cmds = p.get_compile_command_primitive(str(s), None,
                                                        target, cflags=["${CFLAGS}",
                                                                        "-fsanitize=fuzzer"],                                                       compiler_cmd = clang_compiler)
