@@ -32,7 +32,7 @@ def run_single_test(wp, insn, test_info):
     try:
         #r = subprocess.run(cmdline, check=True)
         r, time_ns = runcommon.run_and_time(cmdline, check=True)
-        print(f"{insn.insn}:{test_info.cmdline[1]}: took {time_ns / 1E6} ms")
+        print(f"{insn.insn}:{test_info.cmdline[0]}: Mutant took {time_ns / 1E6} ms")
         return compare(wp, insn, test_info)
     except subprocess.CalledProcessError:
         return False
