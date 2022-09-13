@@ -4,6 +4,7 @@ import argparse
 import subprocess
 from pathlib import Path
 import sys
+import datetime
 
 MYPATH = Path(__file__).parent.absolute()
 
@@ -105,6 +106,17 @@ class Orchestrator:
         logfile = self.logdir / f'collect_fuzzer.{fuzzer}.log'
         run_and_log(cmd, logfile)
 
+    def gather_stats(self):
+        print(f"*** BEGINNING gather_stats")
+        cmd = [str(MYPATH / 'stats_mutants.py'),
+               '--insn', self.insn,
+               '-o', str(self.logdir / f'stats.{self.experiment}.csv'),
+               self.workdir, self.experiment]
+
+        #TODO: This does not distinguish between --all runs?
+        logfile = self.logdir / f'stats.log'
+        run_and_log(cmd, logfile)
+
 if __name__ == "__main__":
     from setup_workdir import WorkParams
 
@@ -125,6 +137,8 @@ if __name__ == "__main__":
 
     x = Orchestrator(args.workdir, args.experiment, args.insn, logdir, serial=args.no_parallel)
 
+    start = datetime.datetime.now()
+    print("Started at", start)
     x.run_mutants()
     x.run_eqvcheck()
     x.run_fuzzer('simple', run_all = args.all)
@@ -137,3 +151,8 @@ if __name__ == "__main__":
     x.run_round2('eqvcheck')
     x.run_round2('fuzzer_simple')
     x.run_round2('fuzzer_custom')
+
+    x.gather_stats()
+    end = datetime.datetime.now()
+    print("End at", end)
+    print("Total time", end - start) # should really be monotonic.

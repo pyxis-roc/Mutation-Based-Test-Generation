@@ -13,6 +13,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="")
     p.add_argument("workdir", help="Work directory")
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
+    p.add_argument("-o", "--output", help="Output file")
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
 
@@ -29,7 +30,8 @@ if __name__ == "__main__":
             mutants = muthelper.get_mutants(insn)
             survivors = muthelper.get_survivors(insn, args.experiment)
 
-            out[i] = {'instruction': i,
+            out[i] = {'experiment': args.experiment,
+                      'instruction': i,
                       'survivors': len(survivors), 'mutants': len(mutants)}
 
             try:
@@ -47,6 +49,10 @@ if __name__ == "__main__":
             out[i][f'noneq_mutants'] = len(noneq_mutants)
 
         df = pl.from_dicts(list(out.values()))
-        df.write_csv(f"stats_{args.experiment}.csv")
+
+        if args.output:
+            df.write_csv(args.output)
+        else:
+            print(df)
     else:
         print(f"WARNING: No instructions specified, use --insn")
