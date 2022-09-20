@@ -2,6 +2,7 @@
 
 import argparse
 import polars as pl
+import ci
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
@@ -23,15 +24,38 @@ if __name__ == "__main__":
         sys.exit(1)
 
     stats_file = expt_dir / f'stats_mutants.{args.experiment}.csv'
-
     if not stats_file.exists():
         print(f"ERROR: {stats_file} does not exist, make sure you've run stats_mutants.py",
               file=sys.stderr)
 
         sys.exit(1)
 
-    stats = pl.read_csv(stats_file)
+    stats_file = expt_dir / f'stats_mutants.{args.experiment}.csv'
+    if not stats_file.exists():
+        print(f"ERROR: {stats_file} does not exist, make sure you've run stats_mutants.py",
+              file=sys.stderr)
 
+        sys.exit(1)
+
+
+    timing_file = expt_dir / f'stats_timing_summary.{args.experiment}.csv'
+    if not timing_file.exists():
+        print(f"ERROR: {timing_file} does not exist, make sure you've run stats_timing.py",
+              file=sys.stderr)
+
+        sys.exit(1)
+
+    stats = pl.read_csv(stats_file)
+    timing = pl.read_csv(timing_file)
+
+    mutant_timing = timing.filter(pl.col("source") == "mutation")
+    stats = stats.join(mutant_timing, on=["experiment", "instruction"])
+
+    stats = stats.with_columns([
+        pl.col('time_ns_count').apply(lambda c: ci.critlevel(c, 95)).alias("_time_ns_critlevel"),
+    ])
+
+    #TODO: ci_95
     stats = stats.with_columns(
         [
             (pl.col('mutants') - pl.col('survivors')).alias("Kill #1"),
@@ -42,10 +66,16 @@ if __name__ == "__main__":
             (pl.col('round2.eqvcheck')).alias("Left.EC"),
             (pl.col('round2.fuzzer_simple')).alias("Left.FS"),
             (pl.col('round2.fuzzer_custom')).alias("Left.FC"),
+            (pl.col('time_ns_avg') / 1E6).alias("time_ms_avg"),
+            pl.struct(["time_ns_count", "time_ns_stdev", "_time_ns_critlevel"]).apply(lambda x: ci.calc_ci_2(x['_time_ns_critlevel'], x['time_ns_stdev'] / 1E6, x['time_ns_count'])).alias("time_ms_ci95")
         ])
 
     # for now, print out individual kills, but in final version
     # unless kills differ, remove individual kill columns.
 
-    print(stats[["instruction", "mutants", "Kill #1", "Same", 'Kill.EC #2', 'Kill.FS #2', 'Kill.FC #2', 'Left.EC', 'Left.FS', 'Left.FC']])
+    tbl1 = stats[["instruction", "mutants", "Kill #1", "Same", 'Kill.EC #2', 'Kill.FS #2', 'Kill.FC #2', 'Left.EC', 'Left.FS', 'Left.FC', 'time_ms_avg', 'time_ms_ci95']]
 
+    if args.output:
+        tbl1.write_csv(args.output)
+    else:
+        print(tbl1)
