@@ -44,5 +44,8 @@ if __name__ == "__main__":
             (pl.col('round2.fuzzer_custom')).alias("Left.FC"),
         ])
 
+    # for now, print out individual kills, but in final version
+    # unless kills differ, remove individual kill columns.
+
     print(stats[["instruction", "mutants", "Kill #1", "Same", 'Kill.EC #2', 'Kill.FS #2', 'Kill.FC #2', 'Left.EC', 'Left.FS', 'Left.FC']])
 

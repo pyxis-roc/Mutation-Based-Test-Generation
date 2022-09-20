@@ -55,7 +55,11 @@ if __name__ == "__main__":
             else:
                 print(df)
 
-            summ = df.groupby(['experiment', 'source', 'instruction']).agg([pl.sum('time_ns')])
+            summ = df.groupby(['experiment', 'source', 'instruction']).agg([pl.sum('time_ns').alias("time_ns_sum"),
+                                                                            pl.mean('time_ns').alias("time_ns_avg"),
+                                                                            pl.col('time_ns').len().alias("time_ns_count"),
+                                                                            pl.std('time_ns').alias("time_ns_stdev")
+                                                                            ])
             if args.os:
                 summ.write_csv(args.os)
             else:
