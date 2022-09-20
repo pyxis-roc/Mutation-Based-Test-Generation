@@ -117,6 +117,16 @@ class Orchestrator:
         logfile = self.logdir / f'mutant_stats.log'
         run_and_log(cmd, logfile)
 
+    def gather_survivor_stats(self):
+        print(f"*** BEGINNING gather_survivor_stats")
+        cmd = [str(MYPATH / 'stats_survivors.py'),
+               '--insn', self.insn,
+               '-o', str(self.logdir / f'stats_survivors.{self.experiment}.txt'),
+               self.workdir, self.experiment]
+
+        logfile = self.logdir / f'survivor_stats.log'
+        run_and_log(cmd, logfile)
+
     def gather_input_stats(self):
         print(f"*** BEGINNING gather_input_stats")
         cmd = [str(MYPATH / 'stats_inputs.py'),
@@ -177,6 +187,7 @@ if __name__ == "__main__":
     x.run_round2('fuzzer_custom')
 
     x.gather_mutant_stats()
+    x.gather_survivor_stats()
     x.gather_input_stats()
     x.gather_timing_stats()
 
