@@ -43,11 +43,11 @@ class FuzzerExecutor:
 
         cmd = [str(mutant), f"-exact_artifact_path={odir}"]
 
-        if not mutant.exists():
-            r = self.make(mutant)
-            if not (r == 0):
-                print(f"{mutant}:ERROR: Compilation appears to have failed. Continuing anyway.",
-                      file=sys.stderr)
+        # run make always to ensure correct binaries
+        r = self.make(mutant)
+        if not (r == 0):
+            print(f"{mutant}:ERROR: Compilation appears to have failed. Continuing anyway.",
+                  file=sys.stderr)
 
         print(f"{mutant}: {' '.join(cmd)}", file=sys.stderr)
 
