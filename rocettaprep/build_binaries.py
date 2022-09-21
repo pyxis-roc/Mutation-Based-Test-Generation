@@ -25,6 +25,9 @@ def make_mutants(wp, insn, mutant="music", stderr=parsl.AUTO_LOGNAME, stdout=par
 
 def get_ba_result(header, ba):
     try:
+        # for some reason, this does not catch parsl.app.error.BashAppNoReturn,
+        # but it is logged to parsl.log.
+
         res = x.result()
         if res == 0:
             print(f"{header}: Success.")
@@ -32,7 +35,7 @@ def get_ba_result(header, ba):
     except BashExitFailure as e:
         print(f"{header}: Failed with code {e.exitcode}")
     except DependencyError as e:
-        print(f"{header}: Workflow failed. Examine logs.")
+        print(f"{header}: Workflow failed. Examine logs in runinfo (usually).")
 
     return False
 
@@ -66,5 +69,6 @@ if __name__ == "__main__":
     for i, x  in out:
         if get_ba_result(i, x):
             # run mutants one at a time, since make -j
+            insn = Insn(i)
             m = make_mutants(wp, insn, label=i)
             get_ba_result(i + " mutants", m)
