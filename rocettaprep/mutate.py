@@ -54,6 +54,10 @@ class MUSICMutator:
             # TODO: maybe add some compile commands as well
             cmd.append("--")
 
+            # this patches in a faked ptxc_utils.h that avoids Generics.
+            # makes MUSIC mutate FTZ again.
+            cmd.extend(["-I", Path(__file__).parent / 'include'])
+
             # TODO: move this to use wp.include_dirs?
             cmd.extend(["-I", self.csemantics.parent])
 
