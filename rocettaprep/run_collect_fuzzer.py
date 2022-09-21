@@ -83,6 +83,7 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple'):
         mutsrc = workdir / f"libfuzzer_{fuzzer}" / p['target']
         inputs = info.get_inputs(insn, mutsrc)
         if inputs is not None:
+            print(f"fuzzer_{fuzzer}: {p}: Got inputs {inputs}", file=sys.stderr)
             totalgen += 1
             if inputs not in output_inputs:
                 output_inputs.add(inputs)

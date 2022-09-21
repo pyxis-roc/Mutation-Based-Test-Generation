@@ -156,6 +156,7 @@ def run_gather_witnesses(wp, insn, experiment):
     for p in failed_mutants:
         mutsrc = workdir / "eqchk" / p
         inputs_out = info.get_inputs(insn, mutsrc)
+        print(f"eqvcheck: {p}: Got {inputs_out} from trace", file=sys.stderr)
         if inputs_out is None: continue
         inputs, out = inputs_out
         totalgen += 1
