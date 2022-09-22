@@ -23,9 +23,10 @@ from roctest import InsnTest, TempFile
 import time
 
 class FuzzerOutput:
-    def __init__(self, wp, experiment):
+    def __init__(self, wp, experiment, subset = ''):
         self.wp = wp
         self.experiment = experiment
+        self.subset = subset
 
     def gen_inputs(self, data, struct_fmt):
         def fmt_value(d, ty):
@@ -47,7 +48,12 @@ class FuzzerOutput:
         return inputs
 
     def get_inputs(self, insn, mutant):
-        ofile = mutant.parent / f"fuzzer_output.{mutant.name}.{self.experiment}"
+        if self.subset:
+            subset = 'all.'
+        else:
+            subset = ''
+
+        ofile = mutant.parent / f"fuzzer_output.{mutant.name}.{subset}{self.experiment}"
 
         if not ofile.exists():
             return None
@@ -64,17 +70,21 @@ class FuzzerOutput:
 
             unpacked_data = struct.unpack(struct_fmt, data)
 
-
             inp = self.gen_inputs(unpacked_data, struct_fmt)
             return tuple(inp)
 
-def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple'):
+def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple', all_subset = False):
     tt = InsnTest(wp, insn)
 
     workdir = wp.workdir / insn.working_dir
 
     mutants = muthelper.get_mutants(insn)
-    info = FuzzerOutput(wp, experiment)
+    info = FuzzerOutput(wp, experiment, 'all' if all_subset else '')
+
+    if all_subset:
+        subset = 'all.'
+    else:
+        subset = ''
 
     output_inputs = set() # confusing .., used for deduplication
     totalgen = 0
@@ -91,20 +101,20 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple'):
                 duplicates += 1
 
     # TODO: extract this out into a common lib?
-    with open(workdir / f"libfuzzer_{fuzzer}" / f"inputgen.{experiment}.json", "w") as f:
+    with open(workdir / f"libfuzzer_{fuzzer}" / f"inputgen.{subset}{experiment}.json", "w") as f:
         json.dump({'experiment': experiment,
                    'instruction': insn.insn,
-                   'source': f'libfuzzer_{fuzzer}',
+                   'source': f'{subset}libfuzzer_{fuzzer}',
                    'total': totalgen,
                    'unique': totalgen - duplicates}, fp=f)
 
-    print(f"{insn.insn}:{experiment}:{fuzzer}: Fuzzer generated {totalgen} inputs, {totalgen-duplicates} unique.")
+    print(f"{insn.insn}:{subset}{experiment}:{fuzzer}: Fuzzer generated {totalgen} inputs, {totalgen-duplicates} unique.")
 
     if len(output_inputs) == 0:
         return
 
-    inpfile = workdir / f"libfuzzer_{fuzzer}_inputs.{experiment}.ssv"
-    outfile = workdir / "outputs" / f"libfuzzer_{fuzzer}_outputs.{experiment}.ssv"
+    inpfile = workdir / f"libfuzzer_{fuzzer}_inputs.{subset}{experiment}.ssv"
+    outfile = workdir / "outputs" / f"libfuzzer_{fuzzer}_outputs.{subset}{experiment}.ssv"
 
     with open(inpfile, "w") as fin:
         for x in output_inputs:
@@ -113,7 +123,7 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple'):
     with open(workdir / "testcases.json", "r") as f:
         testcases = json.load(fp=f)
 
-    srcname = f'libfuzzer_{fuzzer}.{experiment}'
+    srcname = f'{subset}libfuzzer_{fuzzer}.{experiment}'
 
     i = None
     for i, t in enumerate(testcases['tests']):
@@ -130,9 +140,9 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple'):
     it = InsnTest(wp, insn)
     it.set_insn_info(testcases)
 
-    print(f"{insn.insn}:{experiment}:{fuzzer}: Regenerating outputs for fuzzer inputs", file=sys.stderr)
+    print(f"{insn.insn}:{subset}{experiment}:{fuzzer}: Regenerating outputs for fuzzer inputs", file=sys.stderr)
     # always regenerate everything
-    for t in it.gen_tests(filter_fn=lambda x: x[1]['source'] == f'libfuzzer_{fuzzer}.{experiment}',
+    for t in it.gen_tests(filter_fn=lambda x: x[1]['source'] == f'{subset}libfuzzer_{fuzzer}.{experiment}',
                           output_fn = lambda ndx, tc, insn: TempFile(path=tc['output'])):
         cmdline = [c.get_name() if isinstance(c, TempFile) else c for c in t.cmdline]
         subprocess.run(cmdline, check=True)
@@ -148,6 +158,7 @@ if __name__ == "__main__":
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--fuzzer", help="Choose variant of fuzzer outputs to collect",
                    choices=['simple', 'custom'], default='simple')
+    p.add_argument("--all", help="Process the --all subset", action="store_true")
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -159,6 +170,7 @@ if __name__ == "__main__":
         for i in insns:
             insn = Insn(i)
             start = time.monotonic_ns()
-            run_gather_fuzzer(wp, insn, args.experiment, muthelper, fuzzer = args.fuzzer)
+            run_gather_fuzzer(wp, insn, args.experiment, muthelper, fuzzer = args.fuzzer,
+                              all_subset=args.all)
             end = time.monotonic_ns()
             print(f"{insn.insn}:{args.experiment}:{args.fuzzer}: Gathering inputs took {(end - start)/1E6} ms", file=sys.stderr)
