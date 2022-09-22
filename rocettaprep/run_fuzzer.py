@@ -24,9 +24,10 @@ import parsl
 from runcommon import run_and_time
 
 class FuzzerExecutor:
-    def __init__(self, wp, experiment):
+    def __init__(self, wp, experiment, subset = ''):
         self.wp = wp
         self.experiment = experiment
+        self.subset = subset
 
     def make(self, mutant_exec):
         p = mutant_exec.parent
@@ -38,8 +39,14 @@ class FuzzerExecutor:
         return r.returncode
 
     def run(self, insn, mutant):
+
+        if self.subset:
+            subset = 'all.'
+        else:
+            subset = ''
+
         # this can make running repeats painful.
-        odir = mutant.parent / f"fuzzer_output.{mutant.name}.{self.experiment}"
+        odir = mutant.parent / f"fuzzer_output.{mutant.name}.{subset}{self.experiment}"
 
         cmd = [str(mutant), f"-exact_artifact_path={odir}"]
 
@@ -54,9 +61,9 @@ class FuzzerExecutor:
         try:
             r, t = run_and_time(cmd, timeout_s = 15)
             if t is not None:
-                print(f"{mutant}:{self.experiment}: Total fuzzing time {t/1E6} ms, retcode = {r.returncode}", file=sys.stderr)
+                print(f"{mutant}:{subset}{self.experiment}: Total fuzzing time {t/1E6} ms, retcode = {r.returncode}", file=sys.stderr)
             else:
-                print(f"{mutant}:{self.experiment}: Fuzzing timed out", file=sys.stderr)
+                print(f"{mutant}:{subset}{self.experiment}: Fuzzing timed out", file=sys.stderr)
 
             return {'time_ns': t, 'retcode': r.returncode}
         except FileNotFoundError:
@@ -77,9 +84,15 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
     mutants = muthelper.get_mutants(insn)
     survivors = muthelper.get_survivors(insn, experiment)
 
-    executor = FuzzerExecutor(wp, experiment)
+    executor = FuzzerExecutor(wp, experiment, 'all' if all_mutants else '')
 
-    with open(workdir / f"eqvcheck_results.{experiment}.json", "r") as f:
+    if all_mutants:
+        all_suffix = '.all'
+    else:
+        all_suffix = ''
+
+    # equivalence checker must be run before fuzzer.
+    with open(workdir / f"eqvcheck_results{all_suffix}.{experiment}.json", "r") as f:
         not_equivalent = set(json.load(fp=f))
 
     if all_mutants:
@@ -107,7 +120,7 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
             results.append((p, r))
 
     # fuzzer doesn't have 'results' like eqvcheck?
-    with open(workdir / f"libfuzzer_{fuzzer}_results.{experiment}.json", "w") as f:
+    with open(workdir / f"libfuzzer_{fuzzer}_results{all_suffix}.{experiment}.json", "w") as f:
         json.dump(dict(results), fp=f)
 
 if __name__ == "__main__":
@@ -137,5 +150,5 @@ if __name__ == "__main__":
 
         for i in insns:
             insn = Insn(i)
-            run_fuzzer(wp, insn, args.experiment, muthelper, all_mutants = args.all, fuzzer=args.fuzzer, parallel = args.no_parallel)
+            run_fuzzer(wp, insn, args.experiment, muthelper, all_mutants = args.all, fuzzer=args.fuzzer, parallel = not args.no_parallel)
 
