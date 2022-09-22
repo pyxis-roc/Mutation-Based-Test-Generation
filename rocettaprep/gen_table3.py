@@ -12,6 +12,7 @@ if __name__ == "__main__":
     p.add_argument("workdir", help="Work directory")
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
     p.add_argument("-o", "--output", help="Output file")
+    p.add_argument("--all", help="Process --all data", action="store_true")
 
     args = p.parse_args()
 
@@ -37,10 +38,15 @@ if __name__ == "__main__":
 
         sys.exit(1)
 
-    stats = pl.read_csv(stats_file).filter(pl.col("source") == "eqvcheck")
+    if args.all:
+        src = 'all.eqvcheck'
+    else:
+        src = 'eqvcheck'
+
+    stats = pl.read_csv(stats_file).filter(pl.col("source") == src)
     timing = pl.read_csv(timing_file)
 
-    eqvcheck_timing = timing.filter(pl.col("source") == "eqvcheck")
+    eqvcheck_timing = timing.filter(pl.col("source") == src)
     stats = stats.join(eqvcheck_timing, on=["experiment", "instruction"])
 
     stats = stats.with_columns([
