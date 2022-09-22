@@ -33,14 +33,20 @@ CBMC_RC_CONV_ERROR = 6
 CBMC_RC_VERIFICATION_UNSAFE = 10 # also conversion error when writing to other file.
 
 class CBMCExecutor:
-    def __init__(self, wp, experiment):
+    def __init__(self, wp, experiment, subset = ''):
         self.wp = wp
         self.experiment = experiment
+        self.subset = subset
 
     def run(self, insn, mutant):
         xinc = list(zip(itertools.repeat("-I"), self.wp.include_dirs))
 
-        ofile = mutant.parent / f"cbmc_output.{mutant.name}.{self.experiment}.json"
+        if self.subset:
+            subset = self.subset + '.'
+        else:
+            subset = ''
+
+        ofile = mutant.parent / f"cbmc_output.{mutant.name}.{subset}{self.experiment}.json"
         cmd = ["cbmc", "--json-ui", "--trace", "-I", str(self.wp.csemantics.parent)]
         cmd.extend(xinc)
         cmd.append(str(mutant))
@@ -48,9 +54,9 @@ class CBMCExecutor:
         print(" ".join(cmd))
         r, t = run_and_time(cmd, stdout=h) # TODO: add timeout
         if t is not None:
-            print(f"{insn.insn}:{mutant}:{self.experiment}: Equivalence checker took {t/1E6} ms, retcode={r.returncode}", file=sys.stderr)
+            print(f"{insn.insn}:{mutant}:{subset}{self.experiment}: Equivalence checker took {t/1E6} ms, retcode={r.returncode}", file=sys.stderr)
         else:
-            print(f"{insn.insn}:{mutant}:{self.experiment}: Equivalence checker timed out, retcode={r.returncode}", file=sys.stderr)
+            print(f"{insn.insn}:{mutant}:{subset}{self.experiment}: Equivalence checker timed out, retcode={r.returncode}", file=sys.stderr)
 
         os.close(h)
         return {'time_ns': t, 'retcode': r.returncode}
@@ -67,7 +73,7 @@ def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel
     mutants = muthelper.get_mutants(insn)
     survivors = muthelper.get_survivors(insn, experiment)
 
-    executor = CBMCExecutor(wp, experiment)
+    executor = CBMCExecutor(wp, experiment, 'all' if all_mutants else '')
 
     if all_mutants:
         run_on = [x['src'] for x in mutants]

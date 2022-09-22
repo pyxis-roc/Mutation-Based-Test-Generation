@@ -139,12 +139,17 @@ class CBMCOutput:
 
             assert False, f"{ofile}:cProverStatus not found in status: {status}"
 
-def run_gather_witnesses(wp, insn, experiment):
+def run_gather_witnesses(wp, insn, experiment, all_subset = False):
     tt = InsnTest(wp, insn)
 
     workdir = wp.workdir / insn.working_dir
 
-    with open(workdir / f"eqvcheck_results.{experiment}.json", "r") as f:
+    if all_subset:
+        subset = 'all.'
+    else:
+        subset = ''
+
+    with open(workdir / f"eqvcheck_results.{subset}{experiment}.json", "r") as f:
         failed_mutants = json.load(fp=f)
 
     info = CBMCOutput(wp, experiment)
@@ -170,17 +175,17 @@ def run_gather_witnesses(wp, insn, experiment):
         else:
             outputs[inputs] = out
 
-    with open(workdir / "eqchk" / f"inputgen.{experiment}.json", "w") as f:
+    with open(workdir / "eqchk" / f"inputgen.{subset}{experiment}.json", "w") as f:
         json.dump({'experiment': experiment,
                    'instruction': insn.insn,
-                   'source': 'eqvcheck',
+                   'source': f'{subset}eqvcheck',
                    'total': totalgen,
                    'unique': totalgen - duplicates}, fp=f)
 
     print(f"{insn.insn}: Equivalence checker generated {totalgen} witnesses with {totalgen-duplicates} unique inputs.", file=sys.stderr)
 
-    inpfile = workdir / f"eqvcheck_inputs.{experiment}.ssv"
-    outfile = workdir / "outputs" / f"eqvcheck_outputs.{experiment}.ssv"
+    inpfile = workdir / f"eqvcheck_inputs.{subset}{experiment}.ssv"
+    outfile = workdir / "outputs" / f"eqvcheck_outputs.{subset}{experiment}.ssv"
 
     with open(inpfile, "w") as fin:
         with open(outfile, "w") as fout:
@@ -191,7 +196,7 @@ def run_gather_witnesses(wp, insn, experiment):
     with open(workdir / "testcases.json", "r") as f:
         testcases = json.load(fp=f)
 
-    srcname = f'eqvcheck.{experiment}'
+    srcname = f'{subset}eqvcheck.{experiment}'
 
     i = None
     for i, t in enumerate(testcases['tests']):
@@ -213,6 +218,7 @@ if __name__ == "__main__":
     p.add_argument("workdir", help="Work directory")
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
+    p.add_argument("--all", help="Process --all subset", action="store_true")
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -223,6 +229,6 @@ if __name__ == "__main__":
         for i in insns:
             insn = Insn(i)
             start = time.monotonic_ns()
-            run_gather_witnesses(wp, insn, args.experiment)
+            run_gather_witnesses(wp, insn, args.experiment, args.all)
             end = time.monotonic_ns()
             print(f"{insn.insn}:{args.experiment}: gathering witnesses took {(end - start) / 1E6} ms", file=sys.stderr)
