@@ -12,7 +12,9 @@ if __name__ == "__main__":
     p.add_argument("workdir", help="Work directory")
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
     p.add_argument("-o", "--output", help="Output file")
-    p.add_argument("--all", help="Process --all data", action="store_true")
+    p.add_argument("--all", help="Process --all data", action="store_true") # this generates table 4
+    p.add_argument("--src", help="Source", choices=['eqvcheck', 'fuzzer_simple', 'fuzzer_custom'],
+                   default='eqvcheck')
 
     args = p.parse_args()
 
@@ -38,12 +40,18 @@ if __name__ == "__main__":
 
         sys.exit(1)
 
-    if args.all:
-        src = 'all.eqvcheck'
+    if args.src.startswith('fuzzer'):
+        inpsrc = 'lib' + args.src
     else:
-        src = 'eqvcheck'
+        inpsrc = args.src
 
-    stats = pl.read_csv(stats_file).filter(pl.col("source") == src)
+    if args.all:
+        src = f'all.{args.src}'
+        inpsrc = f'all.{inpsrc}'
+    else:
+        src = args.src
+
+    stats = pl.read_csv(stats_file).filter(pl.col("source") == inpsrc)
     timing = pl.read_csv(timing_file)
 
     eqvcheck_timing = timing.filter(pl.col("source") == src)
