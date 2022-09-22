@@ -27,13 +27,14 @@ if __name__ == "__main__":
             insn = Insn(i)
 
             for igsrc in ['eqchk', 'libfuzzer_simple', 'libfuzzer_custom']:
-                f = wp.workdir / insn.working_dir / igsrc / f'inputgen.{args.experiment}.json'
-                print(f)
-                if f.exists():
+                for subset in ['', 'all.']:
+                    f = wp.workdir / insn.working_dir / igsrc / f'inputgen.{subset}{args.experiment}.json'
                     print(f)
-                    with open(f, "r") as fp:
-                        d = json.load(fp=fp)
-                        out.append(d)
+                    if f.exists():
+                        print(f)
+                        with open(f, "r") as fp:
+                            d = json.load(fp=fp)
+                            out.append(d)
 
         if len(out):
             df = pl.from_dicts(out)

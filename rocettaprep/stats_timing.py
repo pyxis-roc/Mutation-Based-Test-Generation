@@ -27,10 +27,17 @@ if __name__ == "__main__":
         for i in insns:
             insn = Insn(i)
 
+            # we seem to be ignoring round2 timing for re-running mutants?
+
             for timsrc, src in [(f'eqvcheck_timing.{args.experiment}.json', 'eqvcheck'),
                                 (f'libfuzzer_simple_results.{args.experiment}.json', 'fuzzer_simple'),
                                 (f'libfuzzer_custom_results.{args.experiment}.json', 'fuzzer_custom'),
-                                (f'mutant_timing.{args.experiment}.json', 'mutation')]:
+                                (f'mutant_timing.{args.experiment}.json', 'mutation'),
+
+                                (f'eqvcheck_timing.all.{args.experiment}.json', 'all.eqvcheck'),
+                                (f'libfuzzer_simple_results.all.{args.experiment}.json', 'all.fuzzer_simple'),
+                                (f'libfuzzer_custom_results.all.{args.experiment}.json', 'all.fuzzer_custom'),
+            ]:
 
                 f = wp.workdir / insn.working_dir / timsrc
                 if f.exists():
