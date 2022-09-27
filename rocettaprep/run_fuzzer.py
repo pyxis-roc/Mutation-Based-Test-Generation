@@ -67,7 +67,7 @@ class FuzzerExecutor:
 
             return {'time_ns': t, 'retcode': r.returncode}
         except FileNotFoundError:
-            print("ERROR: {mutant} does not exist.", file=sys.stderr)
+            print(f"ERROR: {mutant} does not exist.", file=sys.stderr)
             return None
 
         assert False

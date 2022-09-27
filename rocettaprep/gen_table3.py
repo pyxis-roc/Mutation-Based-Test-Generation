@@ -60,11 +60,11 @@ if __name__ == "__main__":
     stats = stats.with_columns([
         pl.col('time_ns_count').apply(lambda c: ci.critlevel(c, 95)).alias("_time_ns_critlevel"),
     ])
-
+    print(stats)
     stats = stats.with_columns(
         [
             (pl.col('time_ns_avg') / 1E6).alias("time_ms_avg"),
-            pl.struct(["time_ns_count", "time_ns_stdev", "_time_ns_critlevel"]).apply(lambda x: ci.calc_ci_2(x['_time_ns_critlevel'], x['time_ns_stdev'] / 1E6, x['time_ns_count'])).alias("time_ms_ci95")
+            pl.struct(["time_ns_count", "time_ns_stdev", "_time_ns_critlevel"]).apply(lambda x: ci.calc_ci_2(x['_time_ns_critlevel'], x['time_ns_stdev'] / 1E6, x['time_ns_count']) if x['time_ns_stdev'] is not None else -111).alias("time_ms_ci95") # TODO
         ])
 
     tbl = stats[["instruction", 'total', 'unique', 'time_ms_avg', 'time_ms_ci95']]

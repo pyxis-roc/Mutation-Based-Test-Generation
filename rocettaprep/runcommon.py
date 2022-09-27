@@ -17,4 +17,7 @@ def run_and_time(cmd, check=False, stdout=None, stderr=None, timeout_s = None):
         # timed out
         return obj, None
 
+    if timeout_s is not None and (obj.returncode == 127):
+        raise FileNotFoundError
+
     return obj, end - start
