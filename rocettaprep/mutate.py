@@ -107,7 +107,8 @@ class MUSICMutator:
                 srcs = [str(odir / s)]
                 f.write(f"{target}: {' '.join(srcs)}\n\t")
                 cmds = p.get_compile_command_primitive(s, "../" + insn.test_file,
-                                                       target, cflags=["${CFLAGS}"])
+                                                       target, cflags=["${CFLAGS}",
+                                                                       "-Wuninitialized"])
 
                 out.append({'src': str(s), 'target': target})
 
