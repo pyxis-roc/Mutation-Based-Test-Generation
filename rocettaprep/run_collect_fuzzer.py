@@ -30,14 +30,12 @@ class FuzzerOutput:
 
     def gen_inputs(self, data, struct_fmt):
         def fmt_value(d, ty):
-            if ty == "I":
+            if ty in ("I", "i", "q", "Q", "h", "H", "b", "B"):
                 return str(d)
             elif ty == 'f':
                 return float_hex2(d)
             elif ty == 'd':
                 return float_hex2(d)
-            elif ty == 'i':
-                return str(d)
             else:
                 raise NotImplementedError(f"Unhandled struct fmt type {ty}")
 

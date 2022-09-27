@@ -6,9 +6,16 @@
 
 from insninfo import insn_info
 
-ty_conv = {'u32': 'uint32_t',
+ty_conv = {'u8': 'uint8_t',
+           'u16': 'uint16_t',
+           'u32': 'uint32_t',
+           'u64': 'uint64_t',
            'f32': 'float',
+            's8': 'int8_t',
+           's16': 'int16_t',
            's32': 'int32_t',
+           's64': 'int64_t',
+           'f64': 'double',
            'pred': 'unsigned int'}
 
 class TyHelper:
@@ -28,10 +35,24 @@ class TyHelper:
             return 'f'
         elif self.tyname == 'double':
             return 'd'
-        elif self.tyname == 'int32_t':
-            return 'i'
+        elif self.tyname == 'int8_t':
+            return 'b'
+        elif self.tyname == 'uint8_t':
+            return 'B'
+        elif self.tyname == 'int8_t':
+            return 'b'
+        elif self.tyname == 'uint16_t':
+            return 'H'
+        elif self.tyname == 'int16_t':
+            return 'h'
         elif self.tyname in ('uint32_t', 'unsigned int'):
             return 'I'
+        elif self.tyname == 'int32_t':
+            return 'i'
+        elif self.tyname == 'uint64_t':
+            return 'Q'
+        elif self.tyname == 'int64_t':
+            return 'q'
         else:
             raise NotImplementedError(f"Need struct unpacker for {self.tyname}")
 
@@ -46,7 +67,10 @@ class FloatTyHelper(TyHelper):
 ty_helpers = {}
 ty_helpers["float"] = FloatTyHelper('float')
 ty_helpers["double"] = FloatTyHelper('double')
-ty_helpers.update(dict([(ty, TyHelper(ty)) for ty in ["int32_t", "uint32_t", "unsigned int"]]))
+ty_helpers.update(dict([(ty, TyHelper(ty)) for ty in [
+    "int8_t", "uint8_t", "uint16_t", "int16_t",
+    "int64_t", "uint64_t", "int32_t", "uint32_t",
+    "unsigned int"]]))
 
 
 class EqvCheckTemplate:

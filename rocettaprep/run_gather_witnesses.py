@@ -42,6 +42,9 @@ def float_hex2(x):
 def bin_to_float(binary):
     return conform_c(float_hex2(struct.unpack('!f',struct.pack('!I', int(binary, 2)))[0]))
 
+def bin_to_double(binary):
+    return conform_c(float_hex2(struct.unpack('!d',struct.pack('!Q', int(binary, 2)))[0]))
+
 def bin_to_int(b):
     return int(b, 2)
 
@@ -52,7 +55,20 @@ def bin_to_sint(b):
     return v if v < mx else v - 2**len(b)
 
 CONVERTERS = {'float': bin_to_float,
+              'double': bin_to_double,
+
               'signed int': bin_to_sint,
+              'int8_t': bin_to_sint,
+              'int16_t': bin_to_sint,
+              'int64_t': bin_to_sint,
+
+              'char': bin_to_sint, # TODO: verify
+              'signed short int': bin_to_sint,
+              'signed long int': bin_to_sint,
+
+              'uint8_t': bin_to_int,
+              'uint16_t': bin_to_int,
+              'uint64_t': bin_to_int,
               'unsigned int': bin_to_int}
 
 class CBMCOutput:
@@ -86,7 +102,12 @@ class CBMCOutput:
         def fmt_value(d):
             ty = d['name']
             if ty == "integer":
-                ty = d['type']
+                if d['type'] == '__CPROVER_size_t':
+                    ty = 'uint64_t'
+                else:
+                    ty = d['type']
+            elif ty == 'float':
+                ty = 'float' if d['width'] == 32 else 'double' if d['width'] == 64 else None
 
             if ty in CONVERTERS:
                 return str(CONVERTERS[ty](d['binary']))
