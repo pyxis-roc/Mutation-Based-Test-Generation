@@ -7,7 +7,7 @@ from eqvcheck_templates import insn_info, ty_helpers, ty_conv
 from mutate import get_mutation_helper, get_mutators
 import shutil
 from build_single_insn import PTXSemantics
-from parsl.app.app import python_app
+from parsl.app.app import python_app, join_app, bash_app
 import parsl
 import sys
 
@@ -230,7 +230,7 @@ def run_process_mutfile(fb, mutsrc):
     dst = fb.process_mutfile(mutsrc)
     return dst
 
-def build_fuzzer_driver(wp, insn, muthelper, setup_only = False, fuzzer = 'simple', parallel = True):
+def build_fuzzer_driver(wp, insn, muthelper, setup_only = False, fuzzer = 'simple', parallel = True, nowait = True):
     mutants = muthelper.get_mutants(insn)
     mutsrcs = [wp.workdir / insn.working_dir / muthelper.srcdir / x['src'] for x in mutants]
 
@@ -244,12 +244,25 @@ def build_fuzzer_driver(wp, insn, muthelper, setup_only = False, fuzzer = 'simpl
             else:
                 print(fb.process_mutfile(s), file=sys.stderr)
 
+        fb.generate_fuzzer_makefile()
+
         if parallel:
+            if nowait:
+                return out
+
             for x in out:
                 print(x.result(), file=sys.stderr)
 
-        fb.generate_fuzzer_makefile()
+@bash_app
+def run_fuzzer_driver(script, workdir, insn, mutator, fuzzer, driver_only):
+    # plain python apps seem to have limited scalability with the threadpoolexecutor
+    # maybe GIL? so use bash app.
+    if driver_only:
+        driver_only = '--driver-only'
+    else:
+        driver_only = ''
 
+    return f'{script} --np --insn {insn} --mutator {mutator} {driver_only} {workdir}'
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
@@ -267,9 +280,18 @@ if __name__ == "__main__":
     wp = WorkParams.load_from(args.workdir)
     muthelper = get_mutation_helper(args.mutator, wp)
 
-    parsl.load(config)
+    if not args.no_parallel:
+        parsl.load(config)
 
+    p = []
     for insn in get_instructions(args.insn):
         print(insn, file=sys.stderr)
         i = Insn(insn)
-        build_fuzzer_driver(wp, i, muthelper, setup_only = args.driver_only, fuzzer = args.fuzzer, parallel = not args.no_parallel)
+        if args.no_parallel:
+            build_fuzzer_driver(wp, i, muthelper, setup_only = args.driver_only, fuzzer = args.fuzzer, parallel = not args.no_parallel)
+        else:
+            p.append(run_fuzzer_driver(__file__, args.workdir, insn, args.mutator, args.fuzzer, args.driver_only))
+
+    if not args.no_parallel:
+        for t in p:
+            print(t.result(), file=sys.stderr)
