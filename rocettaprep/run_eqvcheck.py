@@ -47,12 +47,12 @@ class CBMCExecutor:
             subset = ''
 
         ofile = mutant.parent / f"cbmc_output.{mutant.name}.{subset}{self.experiment}.json"
-        cmd = ["cbmc", "--json-ui", "--trace", "-I", str(self.wp.csemantics.parent)]
+        cmd = ["cbmc", "--unwind", str(64), "--unwind-assertions", "--json-ui", "--trace", "-I", str(self.wp.csemantics.parent)]
         cmd.extend(xinc)
         cmd.append(str(mutant))
         h = os.open(ofile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o666)
         print(" ".join(cmd))
-        r, t = run_and_time(cmd, stdout=h) # TODO: add timeout
+        r, t = run_and_time(cmd, stdout=h, timeout_s = 10*60)
         if t is not None:
             print(f"{insn.insn}:{mutant}:{subset}{self.experiment}: Equivalence checker took {t/1E6} ms, retcode={r.returncode}", file=sys.stderr)
         else:
