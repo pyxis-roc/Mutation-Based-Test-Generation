@@ -10,6 +10,12 @@ ty_conv = {'u8': 'uint8_t',
            'u16': 'uint16_t',
            'u32': 'uint32_t',
            'u64': 'uint64_t',
+
+           'b8': 'uint8_t',
+           'b16': 'uint16_t',
+           'b32': 'uint32_t',
+           'b64': 'uint64_t',
+
            'f32': 'float',
             's8': 'int8_t',
            's16': 'int16_t',
