@@ -159,7 +159,7 @@ if __name__ == "__main__":
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
     p.add_argument("--all", help="Run on all mutants", action='store_true')
     p.add_argument("--no-parallel", help="Run everything serially", action='store_true')
-    p.add_argument("--no-mutants", help="Do not run mutation testing round #1", action='store_true')
+    p.add_argument("--skip-mutants", help="Do not run mutation testing round #1", action='store_true')
 
     args = p.parse_args()
 
@@ -174,7 +174,7 @@ if __name__ == "__main__":
     start = datetime.datetime.now()
     print("Started at", start)
 
-    if not args.no_mutants: x.run_mutants()
+    if not args.skip_mutants: x.run_mutants()
     x.run_eqvcheck()
     x.run_fuzzer('simple', run_all = args.all)
     x.run_fuzzer('custom', run_all = args.all)
