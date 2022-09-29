@@ -98,7 +98,6 @@ def finish_tests_on_mutant(workdir, experiment, subset, round2, r2source, progra
 def run_tests(wp, insn, muthelper, experiment, round2 = False, r2source = 'eqvcheck', all_subset = False):
     import json
     from roctest import InsnTest
-    import setup_workdir
 
     tt = InsnTest(wp, insn)
     tt.load_tests()
