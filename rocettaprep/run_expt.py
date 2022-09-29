@@ -8,6 +8,15 @@ import datetime
 
 MYPATH = Path(__file__).parent.absolute()
 
+if False:
+    RUN_MUTANTS = 'run_mutants.py'
+    RUN_EQVCHECK = 'run_eqvcheck.py'
+    RUN_FUZZER = 'run_fuzzer.py'
+else:
+    RUN_MUTANTS = 'run_mutants_2.py'
+    RUN_EQVCHECK = 'run_eqvcheck_2.py'
+    RUN_FUZZER = 'run_fuzzer_2.py'
+
 def run_and_log(cmd, logfile):
     with open(logfile, "w") as f:
         print('Running', ' '.join(cmd), file=sys.stderr)
@@ -27,14 +36,13 @@ class Orchestrator:
 
     def run_mutants(self):
         print(f"*** BEGINNING run_mutants")
-        cmd = [str(MYPATH / 'run_mutants.py'), '--insn', self.insn, self.workdir, self.experiment]
+        cmd = [str(MYPATH / RUN_MUTANTS), '--insn', self.insn, self.workdir, self.experiment]
         logfile = self.logdir / 'music_mutants.log'
         run_and_log(cmd, logfile)
 
     def run_round2(self, r2source):
         print(f"*** BEGINNING round2 on {r2source}")
-        print(MYPATH, MYPATH / 'run_mutants.py')
-        cmd = [str(MYPATH / 'run_mutants.py'), '--insn', self.insn,
+        cmd = [str(MYPATH / RUN_MUTANTS), '--insn', self.insn,
                '--round2',
                '--r2source', r2source,
                self.workdir, self.experiment]
@@ -44,7 +52,7 @@ class Orchestrator:
 
     def run_fuzzer(self, fuzzer, run_all=False):
         print(f"*** BEGINNING fuzzer {fuzzer}")
-        cmd = [str(MYPATH / 'run_fuzzer.py'),
+        cmd = [str(MYPATH / RUN_FUZZER),
                '--mutator', self.mutator,
                '--insn', self.insn,
                '--fuzzer', fuzzer]
@@ -66,7 +74,7 @@ class Orchestrator:
 
     def run_eqvcheck(self, run_all = False):
         print(f"*** BEGINNING eqvcheck")
-        cmd = [str(MYPATH / 'run_eqvcheck.py'),
+        cmd = [str(MYPATH / RUN_EQVCHECK),
                '--mutator', self.mutator,
                '--insn', self.insn]
 
