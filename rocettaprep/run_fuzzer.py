@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 #
-# run_eqvcheck.py
+# run_fuzzer.py
 #
-# Run and generate equivalence checker output.
+# Run fuzzers.
 
 
 import subprocess
