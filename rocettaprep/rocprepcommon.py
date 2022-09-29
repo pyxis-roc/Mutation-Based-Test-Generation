@@ -4,6 +4,8 @@
 #
 # Common utilities.
 
+import datetime
+
 
 def load_instruction_list(fname):
     with open(fname, "r") as f:
@@ -19,4 +21,18 @@ def get_instructions(arg):
         return load_instruction_list(arg[1:])
     else:
         return [arg]
+
+class PrepTimer:
+    def __init__(self):
+        self.start = None
+        self.end = None
+
+    def start_timer(self):
+        self.start = datetime.datetime.now()
+        print("Started at", self.start)
+
+    def end_timer(self):
+        self.end = datetime.datetime.now()
+        print("End at", self.end)
+        print("Total time", self.end - self.start) # should really be monotonic.
 
