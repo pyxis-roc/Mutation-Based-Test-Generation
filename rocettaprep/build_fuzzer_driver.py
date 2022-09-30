@@ -10,6 +10,7 @@ from build_single_insn import PTXSemantics
 from parsl.app.app import python_app, join_app, bash_app
 import parsl
 import sys
+import struct
 
 class FuzzerTemplateSimple:
     """Fuzzer template for simple scheme where we rely on the fuzzer to do
@@ -65,7 +66,7 @@ class FuzzerTemplateSimple:
         out.append("  if(Size != sizeof(struct arg_struct)) return 0;")
 
         # packing check
-        out.append(f"  assert(sizeof(struct arg_struct) == {szcheck});")
+        # out.append(f"  assert(sizeof(struct arg_struct) == {szcheck});")
         out.append("")
 
         # WARNING: ALIGNMENT ISSUES POSSIBLY?
@@ -123,7 +124,7 @@ class FuzzerTemplateCustom(FuzzerTemplateSimple):
         out.append("  if(MaxSize < sizeof(struct arg_struct)) return 0;")
 
         # packing check
-        out.append(f"  assert(sizeof(struct arg_struct) == {szcheck});")
+        #out.append(f"  assert(sizeof(struct arg_struct) == {szcheck});")
         out.append("")
 
         out.append("  args = (struct arg_struct *) Data;")
@@ -131,6 +132,9 @@ class FuzzerTemplateCustom(FuzzerTemplateSimple):
         out.append("  srand(Seed);")
 
         for arg, ty in zip(args, self.get_param_types()):
+            if ty == 'unsigned int':
+                ty = 'uint32_t'
+
             out.append(f"  {arg} = sample_{ty}();")
 
         out.append("return sizeof(struct arg_struct);")
@@ -148,6 +152,17 @@ class FuzzerBuilder:
         self.insn = insn
         self.muthelper = muthelper
         self.template = template
+
+    def add_padding(self, structfmt):
+        max_size = 0
+        max_fmt = None
+        for x in structfmt:
+            if struct.calcsize(x) > max_size:
+                max_size = struct.calcsize(x)
+                max_fmt = x
+
+        # python does not add end padding, but C does.
+        return '@' + structfmt + f'0{max_fmt}'
 
     def setup(self):
         # testfile = self.wp.workdir / self.insn.working_dir / self.insn.test_file
@@ -172,6 +187,8 @@ class FuzzerBuilder:
         with open(odir / "struct_info.txt", "w") as f:
             ptypes = tmpl.get_param_types()
             struct_fmt = "".join([ty_helpers[pty].struct_unpacker() for pty in ptypes])
+            struct_fmt = self.add_padding(struct_fmt)
+
             f.write(struct_fmt)
 
     def process_mutfile(self, mutfile):
@@ -262,7 +279,7 @@ def run_fuzzer_driver(script, workdir, insn, mutator, fuzzer, driver_only):
     else:
         driver_only = ''
 
-    return f'{script} --np --insn {insn} --mutator {mutator} {driver_only} {workdir}'
+    return f'{script} --np --insn {insn} --mutator {mutator} --fuzzer {fuzzer} {driver_only} {workdir}'
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams

@@ -41,7 +41,8 @@ class FuzzerOutput:
 
         inputs = []
         for i in range(len(data)):
-            inputs.append(fmt_value(data[i], struct_fmt[i:i+1]))
+            # ignore leading @
+            inputs.append(fmt_value(data[i], struct_fmt[i+1:i+2]))
 
         return inputs
 
@@ -66,7 +67,11 @@ class FuzzerOutput:
                 print(f"WARNING: {ofile} is 0-byte, most likely the fuzzer crashed due to non-input reasons", file=sys.stderr)
                 return None
 
-            unpacked_data = struct.unpack(struct_fmt, data)
+            try:
+                unpacked_data = struct.unpack(struct_fmt, data)
+            except:
+                print(f"ERROR: {ofile}, len={len(data)}")
+                raise
 
             inp = self.gen_inputs(unpacked_data, struct_fmt)
             return tuple(inp)
@@ -83,6 +88,8 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple', all_su
         subset = 'all.'
     else:
         subset = ''
+
+    print(f"{insn.insn}:{subset}{experiment}:{fuzzer}: Collecting fuzzer inputs.")
 
     output_inputs = set() # confusing .., used for deduplication
     totalgen = 0
