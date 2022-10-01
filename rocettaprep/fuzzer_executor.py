@@ -36,7 +36,7 @@ class FuzzerExecutor:
         print(f"{mutant}: {' '.join(cmd)}", file=sys.stderr)
 
         try:
-            r, t = run_and_time(cmd, timeout_s = 15)
+            r, t = run_and_time(cmd, timeout_s = 5*60)
             if t is not None:
                 print(f"{mutant}:{subset}{self.experiment}: Total fuzzing time {t/1E6} ms, retcode = {r.returncode}", file=sys.stderr)
             else:
