@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 import sys
 import datetime
+import os
 
 MYPATH = Path(__file__).parent.absolute()
 
@@ -191,8 +192,20 @@ if __name__ == "__main__":
 
     x = Orchestrator(args.workdir, args.experiment, args.insn, logdir, serial=args.no_parallel, timeout_s = args.timeout)
 
+    # because we don't run as a package, we modify pythonpath to
+    # allow deserialization.
+
+    pythonpath = os.environ.get('PYTHONPATH', '')
+    if len(pythonpath):
+        pythonpath = str(MYPATH) + ':' + pythonpath
+    else:
+        pythonpath = str(MYPATH)
+
+    os.environ['PYTHONPATH'] = pythonpath
+
     start = datetime.datetime.now()
     print("Started at", start)
+    print(f"PYTHONPATH set to {os.environ['PYTHONPATH']}")
 
     if not args.skip_mutants: x.run_mutants()
     if not args.skip_eqvcheck: x.run_eqvcheck()
