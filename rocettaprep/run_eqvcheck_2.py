@@ -51,7 +51,7 @@ def finish_eqv_check(workdir, all_mutants, experiment, programs = [], inputs = [
         json.dump(dict(out), fp=f)
 
 @join_app
-def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel = True):
+def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel = True, timeout_s = 90):
     import json
     from roctest import InsnTest
 
@@ -62,7 +62,7 @@ def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel
     mutants = muthelper.get_mutants(insn)
     survivors = muthelper.get_survivors(insn, experiment)
 
-    executor = CBMCExecutor(wp, experiment, 'all' if all_mutants else '')
+    executor = CBMCExecutor(wp, experiment, 'all' if all_mutants else '', timeout_s = timeout_s)
 
     if all_mutants:
         run_on = [x['src'] for x in mutants]
@@ -93,6 +93,8 @@ if __name__ == "__main__":
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
     p.add_argument("--all", help="Run equivalence checks on all mutants, not just survivors", action="store_true")
+    p.add_argument("--timeout", help="Timeout to use (seconds)",
+                   type=int, default=90)
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -108,7 +110,7 @@ if __name__ == "__main__":
         out = []
         for i in insns:
             insn = Insn(i)
-            out.append(run_eqv_check(wp, insn, args.experiment, muthelper, all_mutants = args.all, parallel = True))
+            out.append(run_eqv_check(wp, insn, args.experiment, muthelper, all_mutants = args.all, parallel = True, timeout_s = args.timeout))
 
         for i, o in zip(insns, out):
             print(i)

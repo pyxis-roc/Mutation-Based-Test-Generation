@@ -24,24 +24,29 @@ def run_and_log(cmd, logfile):
         subprocess.run(cmd, check=True, stdout=f, stderr=f)
 
 class Orchestrator:
-    def __init__(self, workdir, experiment, insn, logdir, mutator = 'MUSIC', serial = False):
+    def __init__(self, workdir, experiment, insn, logdir, mutator = 'MUSIC', serial = False, timeout_s = 90):
         self.workdir = workdir
         self.experiment = experiment
         self.insn = insn
         self.logdir = logdir
         self.mutator = mutator
         self.serial = serial
+        self.timeout_s = timeout_s
+
         if self.mutator != 'MUSIC':
             raise NotImplementedError(f'Do not support non-MUSIC mutators yet')
 
+    def _begin(self, msg):
+        print(f"*** BEGINNING {msg} {datetime.datetime.now()}")
+
     def run_mutants(self):
-        print(f"*** BEGINNING run_mutants")
+        self._begin(f"run_mutants")
         cmd = [str(MYPATH / RUN_MUTANTS), '--insn', self.insn, self.workdir, self.experiment]
         logfile = self.logdir / 'music_mutants.log'
         run_and_log(cmd, logfile)
 
     def run_round2(self, r2source):
-        print(f"*** BEGINNING round2 on {r2source}")
+        self._begin(f"round2 on {r2source}")
         cmd = [str(MYPATH / RUN_MUTANTS), '--insn', self.insn,
                '--round2',
                '--r2source', r2source,
@@ -51,10 +56,11 @@ class Orchestrator:
         run_and_log(cmd, logfile)
 
     def run_fuzzer(self, fuzzer, run_all=False):
-        print(f"*** BEGINNING fuzzer {fuzzer}")
+        self._begin(f"fuzzer {fuzzer}")
         cmd = [str(MYPATH / RUN_FUZZER),
                '--mutator', self.mutator,
                '--insn', self.insn,
+               '--timeout', str(self.timeout_s),
                '--fuzzer', fuzzer]
 
         note = []
@@ -73,8 +79,9 @@ class Orchestrator:
         run_and_log(cmd, logfile)
 
     def run_eqvcheck(self, run_all = False):
-        print(f"*** BEGINNING eqvcheck")
+        self._begin(f"eqvcheck")
         cmd = [str(MYPATH / RUN_EQVCHECK),
+               '--timeout', str(self.timeout_s),
                '--mutator', self.mutator,
                '--insn', self.insn]
 
@@ -94,7 +101,7 @@ class Orchestrator:
         run_and_log(cmd, logfile)
 
     def run_gather_witnesses(self):
-        print(f"*** BEGINNING run_gather_witnesses")
+        self._begin(f"run_gather_witnesses")
         cmd = [str(MYPATH / 'run_gather_witnesses.py'),
                '--insn', self.insn,
                self.workdir, self.experiment]
@@ -103,7 +110,7 @@ class Orchestrator:
         run_and_log(cmd, logfile)
 
     def run_collect_fuzzer(self, fuzzer):
-        print(f"*** BEGINNING collect_fuzzer {fuzzer}")
+        self._begin(f"collect_fuzzer {fuzzer}")
         cmd = [str(MYPATH / 'run_collect_fuzzer.py'),
                '--insn', self.insn,
                '--mutator', self.mutator,
@@ -115,7 +122,7 @@ class Orchestrator:
         run_and_log(cmd, logfile)
 
     def gather_mutant_stats(self):
-        print(f"*** BEGINNING gather_mutant_stats")
+        self._begin(f"gather_mutant_stats")
         cmd = [str(MYPATH / 'stats_mutants.py'),
                '--insn', self.insn,
                '-o', str(self.logdir / f'stats_mutants.{self.experiment}.csv'),
@@ -126,7 +133,7 @@ class Orchestrator:
         run_and_log(cmd, logfile)
 
     def gather_survivor_stats(self):
-        print(f"*** BEGINNING gather_survivor_stats")
+        self._begin(f"gather_survivor_stats")
         cmd = [str(MYPATH / 'stats_survivors.py'),
                '--insn', self.insn,
                '-o', str(self.logdir / f'stats_survivors.{self.experiment}.txt'),
@@ -136,7 +143,7 @@ class Orchestrator:
         run_and_log(cmd, logfile)
 
     def gather_input_stats(self):
-        print(f"*** BEGINNING gather_input_stats")
+        self._begin(f"gather_input_stats")
         cmd = [str(MYPATH / 'stats_inputs.py'),
                '--insn', self.insn,
                '-o', str(self.logdir / f'stats_inputs.{self.experiment}.csv'),
@@ -147,7 +154,7 @@ class Orchestrator:
         run_and_log(cmd, logfile)
 
     def gather_timing_stats(self):
-        print(f"*** BEGINNING gather_timing_stats")
+        self._begin(f"gather_timing_stats")
         cmd = [str(MYPATH / 'stats_timing.py'),
                '--insn', self.insn,
                '-o', str(self.logdir / f'stats_timing.{self.experiment}.csv'),
@@ -169,6 +176,10 @@ if __name__ == "__main__":
     p.add_argument("--no-parallel", help="Run everything serially", action='store_true')
     p.add_argument("--skip-mutants", help="Do not run mutation testing round #1", action='store_true')
     p.add_argument("--skip-eqvcheck", help="Do not run equivalence checking", action='store_true')
+    p.add_argument("--skip-fuzzers", help="Do not run fuzzers", action='store_true')
+    p.add_argument("--skip-round2", help="Do not run round 2 mutation testing", action='store_true')
+    p.add_argument("--skip-stats", help="Do not update stats", action='store_true')
+    p.add_argument("--timeout", help="Timeout to use (seconds)", type=int, default=90)
 
     args = p.parse_args()
 
@@ -178,28 +189,34 @@ if __name__ == "__main__":
     if not logdir.exists():
         logdir.mkdir()
 
-    x = Orchestrator(args.workdir, args.experiment, args.insn, logdir, serial=args.no_parallel)
+    x = Orchestrator(args.workdir, args.experiment, args.insn, logdir, serial=args.no_parallel, timeout_s = args.timeout)
 
     start = datetime.datetime.now()
     print("Started at", start)
 
     if not args.skip_mutants: x.run_mutants()
     if not args.skip_eqvcheck: x.run_eqvcheck()
-    x.run_fuzzer('simple', run_all = args.all)
-    x.run_fuzzer('custom', run_all = args.all)
 
-    x.run_gather_witnesses()
-    x.run_collect_fuzzer('simple')
-    x.run_collect_fuzzer('custom')
+    if not args.skip_fuzzers:
+        x.run_fuzzer('simple', run_all = args.all)
+        x.run_fuzzer('custom', run_all = args.all)
 
-    x.run_round2('eqvcheck')
-    x.run_round2('fuzzer_simple')
-    x.run_round2('fuzzer_custom')
+    if not args.skip_eqvcheck: x.run_gather_witnesses()
+    if not args.skip_fuzzers:
+        x.run_collect_fuzzer('simple')
+        x.run_collect_fuzzer('custom')
 
-    x.gather_mutant_stats()
-    x.gather_survivor_stats()
-    x.gather_input_stats()
-    x.gather_timing_stats()
+    if not args.skip_round2:
+        # TODO: all?
+        x.run_round2('eqvcheck')
+        x.run_round2('fuzzer_simple')
+        x.run_round2('fuzzer_custom')
+
+    if not args.skip_stats:
+        x.gather_mutant_stats()
+        x.gather_survivor_stats()
+        x.gather_input_stats()
+        x.gather_timing_stats()
 
     end = datetime.datetime.now()
     print("End at", end)

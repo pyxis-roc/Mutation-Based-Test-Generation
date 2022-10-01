@@ -40,7 +40,7 @@ def finish_fuzzer(workdir, fuzzer, all_suffix, experiment, programs=[], inputs=[
         json.dump(dict(results), fp=f)
 
 @join_app
-def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 'simple', parallel = True):
+def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 'simple', parallel = True, timeout_s = 90):
     import json
     from roctest import InsnTest
     from fuzzer_executor import FuzzerExecutor
@@ -52,7 +52,7 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
     mutants = muthelper.get_mutants(insn)
     survivors = muthelper.get_survivors(insn, experiment)
 
-    executor = FuzzerExecutor(wp, experiment, 'all' if all_mutants else '')
+    executor = FuzzerExecutor(wp, experiment, 'all' if all_mutants else '', timeout_s = timeout_s)
 
     if all_mutants:
         all_suffix = '.all'
@@ -97,6 +97,8 @@ if __name__ == "__main__":
     p.add_argument("--all", help="Run the fuzzer on all mutants, not just survivors (NOT RECOMMENDED)", action="store_true")
     p.add_argument("--fuzzer", help="Choose variant of fuzzer to run",
                    choices=['simple', 'custom'], default='simple')
+    p.add_argument("--timeout", help="Timeout to use (seconds)",
+                   type=int, default=90)
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -113,7 +115,7 @@ if __name__ == "__main__":
         out = []
         for i in insns:
             insn = Insn(i)
-            out.append(run_fuzzer(wp, insn, args.experiment, muthelper, all_mutants = args.all, fuzzer=args.fuzzer, parallel = True))
+            out.append(run_fuzzer(wp, insn, args.experiment, muthelper, all_mutants = args.all, fuzzer=args.fuzzer, parallel = True, timeout_s = args.timeout))
 
         for i, o in zip(insns, out):
             print(i)
