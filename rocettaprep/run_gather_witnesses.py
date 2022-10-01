@@ -19,6 +19,7 @@ import math
 import struct
 import sys
 import time
+import inputgen
 
 # stolen from smt2utils
 def conform_c(x):
@@ -133,6 +134,7 @@ class CBMCOutput:
         print(ofile)
         status = data[-1]
         if "cProverStatus" in status:
+            # TODO: avoid tracing unwinding assertions
             if status["cProverStatus"] == "failure":
                 for x in data:
                     if 'result' in x:
@@ -196,40 +198,24 @@ def run_gather_witnesses(wp, insn, experiment, all_subset = False):
         else:
             outputs[inputs] = out
 
-    with open(workdir / "eqchk" / f"inputgen.{subset}{experiment}.json", "w") as f:
-        json.dump({'experiment': experiment,
-                   'instruction': insn.insn,
-                   'source': f'{subset}eqvcheck',
-                   'total': totalgen,
-                   'unique': totalgen - duplicates}, fp=f)
+    inputgen.write_inputgen(workdir / "eqchk",
+                            subset, "eqvcheck", experiment, insn,
+                            totalgen,
+                            totalgen - duplicates)
 
     print(f"{insn.insn}: Equivalence checker generated {totalgen} witnesses with {totalgen-duplicates} unique inputs.", file=sys.stderr)
 
     inpfile = workdir / f"eqvcheck_inputs.{subset}{experiment}.ssv"
     outfile = workdir / "outputs" / f"eqvcheck_outputs.{subset}{experiment}.ssv"
 
-    with open(inpfile, "w") as fin:
-        with open(outfile, "w") as fout:
-            for x in outputs:
-                fin.write(" ".join(x)+"\n")
-                fout.write(" ".join(outputs[x])+"\n")
+    if len(outputs) > 0:
+        with open(inpfile, "w") as fin:
+            with open(outfile, "w") as fout:
+                for x in outputs:
+                    fin.write(" ".join(x)+"\n")
+                    fout.write(" ".join(outputs[x])+"\n")
 
-    with open(workdir / "testcases.json", "r") as f:
-        testcases = json.load(fp=f)
-
-    srcname = f'{subset}eqvcheck.{experiment}'
-
-    i = None
-    for i, t in enumerate(testcases['tests']):
-        if t['source'] == srcname:
-            break # already there, will have the same parameters, so break
-    else:
-        testcases['tests'].append({'input': str(inpfile),
-                                   'output': str(outfile),
-                                   'source': srcname})
-
-        with open(workdir / "testcases.json", "w") as f:
-            json.dump(testcases, fp=f, indent='  ')
+    inputgen.add_testcases(workdir, subset, 'eqvcheck', experiment, len(outputs), inpfile, outfile)
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
