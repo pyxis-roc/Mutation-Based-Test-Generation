@@ -27,7 +27,9 @@ class CBMCExecutor:
             subset = ''
 
         ofile = mutant.parent / f"cbmc_output.{mutant.name}.{subset}{self.experiment}.json"
-        cmd = ["cbmc", "--unwind", str(64), "--unwinding-assertions", "--z3", "--json-ui", "--trace", "-I", str(self.wp.csemantics.parent)]
+        # one more than most loops are expected to execute, removes spurious failures
+        # due to unwinding assertion failures
+        cmd = ["cbmc", "--unwind", str(65), "--unwinding-assertions", "--z3", "--json-ui", "--trace", "-I", str(self.wp.csemantics.parent)]
         cmd.extend(xinc)
         cmd.append(str(mutant))
         h = os.open(ofile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o666)
