@@ -27,3 +27,5 @@ def add_testcases(workdir, subset, source, experiment, ntests, inpfile, outfile)
     with open(workdir / "testcases.json", "w") as f:
         json.dump(testcases, fp=f, indent='  ')
 
+    return testcases
+

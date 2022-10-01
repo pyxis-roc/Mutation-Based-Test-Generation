@@ -21,6 +21,7 @@ import sys
 from run_gather_witnesses import float_hex2
 from roctest import InsnTest, TempFile
 import time
+import inputgen
 
 class FuzzerOutput:
     def __init__(self, wp, experiment, subset = ''):
@@ -105,52 +106,33 @@ def run_gather_fuzzer(wp, insn, experiment, muthelper, fuzzer = 'simple', all_su
             else:
                 duplicates += 1
 
-    # TODO: extract this out into a common lib?
-    with open(workdir / f"libfuzzer_{fuzzer}" / f"inputgen.{subset}{experiment}.json", "w") as f:
-        json.dump({'experiment': experiment,
-                   'instruction': insn.insn,
-                   'source': f'{subset}libfuzzer_{fuzzer}',
-                   'total': totalgen,
-                   'unique': totalgen - duplicates}, fp=f)
+    inputgen.write_inputgen(workdir / f"libfuzzer_{fuzzer}",
+                            subset, f"libfuzzer_{fuzzer}", experiment, insn,
+                            totalgen,
+                            totalgen - duplicates)
 
     print(f"{insn.insn}:{subset}{experiment}:{fuzzer}: Fuzzer generated {totalgen} inputs, {totalgen-duplicates} unique.")
-
-    if len(output_inputs) == 0:
-        return
 
     inpfile = workdir / f"libfuzzer_{fuzzer}_inputs.{subset}{experiment}.ssv"
     outfile = workdir / "outputs" / f"libfuzzer_{fuzzer}_outputs.{subset}{experiment}.ssv"
 
-    with open(inpfile, "w") as fin:
-        for x in output_inputs:
-            fin.write(" ".join(x)+"\n")
+    testcases = inputgen.add_testcases(workdir, subset, f'libfuzzer_{fuzzer}', experiment, len(output_inputs), inpfile, outfile)
 
-    with open(workdir / "testcases.json", "r") as f:
-        testcases = json.load(fp=f)
+    if len(output_inputs) > 0:
+        with open(inpfile, "w") as fin:
+            for x in output_inputs:
+                fin.write(" ".join(x)+"\n")
 
-    srcname = f'{subset}libfuzzer_{fuzzer}.{experiment}'
 
-    i = None
-    for i, t in enumerate(testcases['tests']):
-        if t['source'] == srcname:
-            break # already there, will have the same parameters, so break
-    else:
-        testcases['tests'].append({'input': str(inpfile),
-                                   'output': str(outfile),
-                                   'source': srcname})
+        it = InsnTest(wp, insn)
+        it.set_insn_info(testcases)
 
-        with open(workdir / "testcases.json", "w") as f:
-            json.dump(testcases, fp=f, indent='  ')
-
-    it = InsnTest(wp, insn)
-    it.set_insn_info(testcases)
-
-    print(f"{insn.insn}:{subset}{experiment}:{fuzzer}: Regenerating outputs for fuzzer inputs", file=sys.stderr)
-    # always regenerate everything
-    for t in it.gen_tests(filter_fn=lambda x: x[1]['source'] == f'{subset}libfuzzer_{fuzzer}.{experiment}',
-                          output_fn = lambda ndx, tc, insn: TempFile(path=tc['output'])):
-        cmdline = [c.get_name() if isinstance(c, TempFile) else c for c in t.cmdline]
-        subprocess.run(cmdline, check=True)
+        print(f"{insn.insn}:{subset}{experiment}:{fuzzer}: Regenerating outputs for fuzzer inputs", file=sys.stderr)
+        # always regenerate everything
+        for t in it.gen_tests(filter_fn=lambda x: x[1]['source'] == f'{subset}libfuzzer_{fuzzer}.{experiment}',
+                              output_fn = lambda ndx, tc, insn: TempFile(path=tc['output'])):
+            cmdline = [c.get_name() if isinstance(c, TempFile) else c for c in t.cmdline]
+            subprocess.run(cmdline, check=True)
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
