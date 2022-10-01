@@ -52,8 +52,7 @@ def bin_to_int(b):
 def bin_to_sint(b):
     v = int(b, 2)
     mx = 2**(len(b)-1)-1
-
-    return v if v < mx else v - 2**len(b)
+    return v if v <= mx else v - 2**len(b)
 
 CONVERTERS = {'float': bin_to_float,
               'double': bin_to_double,
