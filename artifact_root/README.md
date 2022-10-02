@@ -17,15 +17,28 @@ This README is based on the README.md in the
 general instructions. The instructions in this file have been
 simplified by fixing many of the paths used in those instructions.
 
-This artifact has been tested on Ubuntu 18.04 LTS and 20.04 LTS. The
-timing descriptions in this document were obtained from a 32-core AMD
-EPYC machine.
+This artifact has been tested on Ubuntu 20.04 LTS and the scripts
+assume Ubuntu 20.04. With minor tweaks to some system packages, the
+scripts should also run on Ubuntu 18.04 LTS. The timing descriptions
+in this document were obtained from a 32-core AMD EPYC machine.
+
+## Container
+
+If you have a Docker/Podman setup, you can use the enclosed
+`Containerfile` to setup a pristine, known-to-work environment with
+minimum fuss. If you decide to do that, follow the instructions in
+`README.Container` file, skip the next section and resume at MUSIC
+Installation.
+
 
 ## Unpacking
 
-Unpack the artifact archive in location with around 50GB of free
-space. We'll refer to this location as `$ARTIFACT`. All commands below
-will be executed, unless otherwise noted, are executed from this location.
+If you decide not to use a container, unpack the artifact archive in
+location with around 50GB of free space (minimum, to run the --all
+experiments for input generation from scratch, you'll need around
+500GB). We'll refer to this location as `$ARTIFACT`. All commands
+below will be executed, unless otherwise noted, are executed from this
+location.
 
 After unpacking, you should see the following files:
 
@@ -38,40 +51,32 @@ After unpacking, you should see the following files:
   - ROCetta-ptx-semantics, directory containing the PTX instruction semantics
   - Data, directory containing the data from our experiments, see the README in that directory for more details.
 
+All the following instructions assume you'll be inside the `insn-testgen-artifact` directory.
+
 ## System Requirements Check
 
-Run `./Mutation-Based-Test-Generation/sys-prereqs.sh`. You should see:
+Run `./Mutation-Based-Test-Generation/sys-prereqs.sh`. You should see this:
 
 ```
 *** GCC version
 gcc (Ubuntu 9.4.0-1ubuntu1~20.04.1) 9.4.0
-Copyright (C) 2019 Free Software Foundation, Inc.
-This is free software; see the source for copying conditions.  There is NO
-warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-
-*** Clang-13 version
-Ubuntu clang version 13.0.1-++20220120110924+75e33f71c2da-1~exp1~20220120231001.58
-Target: x86_64-pc-linux-gnu
-Thread model: posix
-InstalledDir: /usr/bin
-*** Clang-13 version
-clang version 7.0.1-12 (tags/RELEASE_701/final)
-Target: x86_64-pc-linux-gnu
-Thread model: posix
-InstalledDir: /usr/bin
-*** Python 3 version
-Python 3.8.10
+[...]
+Written by Padraig Brady.
 ===> DONE <===
+
 ```
 
 If you instead encounter errors, read the [REQUIREMENTS](REQUIREMENTS.md) file to install the system pre-requisites.
 
 ## MUSIC Installation
 
+[From this steps onwards, the commands are common to both the
+container environment and a standalone environment.]
+
 First, install all MUSIC pre-requisites (from https://github.com/swtv-kaist/MUSIC, an abridged list is below):
 
 ```
-sudo apt-get install clang-7 clang-tools-7 libclang-common-7-dev libclang-7-dev libclang1-7 clang-format-7 python-clang-7 libllvm-7-ocaml-dev libllvm7 llvm-7 llvm-7-dev llvm-7-runtime
+sudo apt-get install clang-7 clang-tools-7 libclang-common-7-dev libclang-7-dev libclang1-7 clang-format-7 python-clang-7 libllvm-7-ocaml-dev libllvm7 llvm-7 llvm-7-dev llvm-7-runtime libz-dev
 ```
 
 Run `./Mutation-Based-Test-Generation/install-music.sh` to download, compile, and setup the MUSIC installation.
@@ -135,7 +140,7 @@ cpp_args: '-DPYCPARSER -D__STDC_VERSION__=199901L -I/tmp/muthome/pycparser-relea
 Setup done
 ```
 
-If you do `ls exptdata`, you should see:
+Note the last line, which should say "Setup done". If you do `ls exptdata`, you should see:
 
 ```
 params.json  ptxc_fake_includes  samplers
@@ -169,7 +174,15 @@ abs_f64 mutants: Failed with code 2
 This is okay since not all mutants are semantically valid and the C
 compiler will not compile them. The standard output and errors of the
 compilation failures are available in the `runinfo/` directory created
-by Parsl for inspection and debugging if necessary.
+by Parsl for inspection and debugging if necessary. This step takes
+around 5 minutes or so.
+
+Correct execution of this command will produce in `exptdata`, a number
+of `working-directory-*` directories, one for each
+instruction. Within each instruction-level directory, there will be
+directories for mutants (`music`), the equivalence checker drivers
+(`eqchk`), the fuzzer drivers (`libfuzzer_simple`, and
+`libfuzzer_custom`), and the known good outputs (`outputs`).
 
 ## Run the small set experiment, normal flow
 
@@ -196,9 +209,11 @@ different experiment name
 ```
 
 This will run all the experiments for Table 4 (input generation from
-scratch) and store the results in
-`exptdata/expt.smallset-scratch/*.csv` for later processing by the
-scripts for the single instruction `abs_f32`. Although you can also use the full `smallset`, it will take much longer, on the order of an hour or so.
+scratch) and store the results in `exptdata/expt.test-scratch/*.csv`
+for later processing by the scripts for the single instruction
+`abs_f32` taking about a minute or so. Although you can also use the
+full `smallset`, it will take much longer, on the order of an hour or
+so.
 
 ## Graphing the Data
 
@@ -211,18 +226,25 @@ worked, everything is setup properly and you can now run the full set
 of experiments.
 
 Use the following commands to build and run the experiments for the
-full set of instructions.
+full set of instructions. This usually takes around 50GB of space.
 
 ```
 ./Mutation-Based-Test-Generation/rocettaprep/build.sh ./Mutation-Based-Test-Generation/rocettaprep/all_insns_except_cc exptdata
 
 ./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --insn @./Mutation-Based-Test-Generation/rocettaprep/all_insns_except_cc exptdata fullset
 
-./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --insn @./Mutation-Based-Test-Generation/rocettaprep/all_insns_except_cc --all exptdata all-fullset
 ```
 
-Note the first step here can take around 8 hours, and the other steps
-can take around 5 hours each.
+Note the first step here can take around 8 hours, and the second step
+can take around 5 hours.
+
+If you decide to run the `--all` portion, make sure you have around
+500GB of disk space, and plenty of time (around 8 hours for
+equivalence check alone!).
+
+```
+./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --insn @./Mutation-Based-Test-Generation/rocettaprep/all_insns_except_cc --all exptdata all-fullset
+```
 
 ## Re-doing Experiments
 

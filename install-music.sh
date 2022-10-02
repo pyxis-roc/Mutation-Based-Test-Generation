@@ -6,7 +6,7 @@ set -e
 
 # needed by all clang-tools to locate their headers
 
-[ ! -f lib ] && ln -s /usr/lib
+[ -f lib ] || ln -sf /usr/lib
 
 make -C MUSIC -j 4
 

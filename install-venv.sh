@@ -2,7 +2,10 @@
 
 set -e
 
-[ ! -d parslenv ] && python3 -m venv parslenv
+# unfortunately if this script halts in between, need to remove
+# parslenv/ and start again.
+
+[ -d parslenv ] || python3 -m venv parslenv
 
 if source parslenv/bin/activate; then
     # versions indicated tested variants

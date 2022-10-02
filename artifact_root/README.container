@@ -1,0 +1,45 @@
+# Container instructions
+
+We supply a container file to quickly setup a known environment using
+Docker/Podman that will enable you to run the scripts in the artifact.
+
+Note: the container storage must have sufficient space to accommodate
+the experimental data (i.e. 50GB for full experiments, and 500GB for
+input generation from scratch).
+
+The container can be run in rootless environments.
+
+IMPORTANT: We did not use a container environment for our experiments,
+however we'll be happy to provide fixes for any bugs encountered in
+this environment.
+
+## Setup the container
+
+We assume you have downloaded the artifact archive (usually
+`insn-testgen-artifact.tar.bz2`) and unpacked it. Then, to build the
+container run the following commands:
+
+```
+cd insn-testgen-artifact
+cp /path/to/downloaded/insn-testgen-artifact.tar.bz2 . # required since this will be copied into the container
+podman build -f Containerfile
+```
+
+Assuming the container image id is `a97e3a9e6a2`, start the container as:
+
+```
+podman run -it a97e3a9e6a2
+```
+
+You will land at a root prompt. Switch to the `test` user:
+
+```
+su - test
+cd insn-testgen-artifact
+```
+
+This is now a fully setup environment that you can test using
+`./Mutation-Based-Test-Generation/sys-prereqs.sh`
+
+Now, continue the instructions in `README.md` starting at "MUSIC
+Installation".
