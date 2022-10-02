@@ -1,0 +1,19 @@
+Available:
+
+The artifact will be made available at zenodo.org using open source
+MIT and LGPLv2.1 or later licenses.
+
+Functional:
+
+The artifact contains all the code to recreate the full experimental
+setup of our paper. In addition, it contains the data from our own
+experiments.
+
+Reusable:
+
+The scripts supplied are used to run custom experiments intended for
+this artifact. However, later work can easily build on these scripts
+to extend our work.
+
+
+

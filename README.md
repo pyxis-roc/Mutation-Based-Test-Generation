@@ -1,42 +1,263 @@
 # Mutation Based Test Generation Pipeline
 
+This repository contains the code and artifact for our paper Pai and
+Shitrit, "Generating Test Suites for GPU Instruction Sets through
+Mutation and Equivalence Checking", to be submitted to ACM TOSEM.
+
+The directory `rocettaprep` contains all the scripts and code used in
+this paper, questions about these to be directed to the first author
+(Sreepathi Pai).
+
+The directory `src` contains the scripts and code for the older
+version of this paper published as a registered report in the FUZZING
+workshop. Questions about this piece of code to be directed to the
+second author (Shoham Shitrit).
+
 # Contact Information
-Shoham Shitrit, University of Rochester '22
-sshitrit@u.rochester.edu 
-shohamshitrit1@gmail.com
 
-# Prerequisites
+Shoham Shitrit, University of Rochester '22, sshitrit@u.rochester.edu, shohamshitrit1@gmail.com
 
-### MUSIC
-This tool relies on MUSIC to generate mutations of C programs. Follow the instructions here[https://github.com/swtv-kaist/MUSIC] to clone and build the tool. 
+Sreepathi Pai, University of Rochester, https://cs.rochester.edu/~sree/
 
-### Pycparser
+# Requirements
 
-This tool depends on pycparser to manipulate C programs and functions inside them.
+This artifact requires around 45GB of disk space for a full
+experiment.
 
-Installing pycparser with `pip install` is suitable, but the tool relies on the fake standard library headers, which can only be accessed by cloning the pycparser repo here[https://github.com/eliben/pycparser]
+It compiles and runs a very large number of files (> 1M) and a
+multicore processor is highly recommended.
 
-* There was also a common parsing issue early in development along the lines of "Atomic Bool not recognized". This was fixed by calling pycparser from the cloned repo, and not the pip package. 
+We used an AMD AMD EPYC 7502P 32-Core Processor on which full parallel
+compilation took about 8 hours, and running the experiments took
+around 15 hours (with 5 minute timeouts) or 5 hours (with the default
+90 second timeouts). The system has 256GB of memory, though this is
+not a memory intensive workload.
+
+## Time Requirements
+
+Here is a rough estimate of the time required for each stage:
+
+  - Compilation: 8 hours
+  - Mutation Round #1: 1 hour
+  - Equivalence Checking (90s timeout): 1 hr 12 minutes
+  - Fuzzing (Simple, 90s timeout): 1hr 17 minutes
+  - Fuzzing (Custom, 90s timeout): 1hr 30 minutes
+  - All other stages: about a minute each
+
+Note this system has only been tested running everything to
+completion. Although stages can be run individually, there is very
+little software support to do so and ensure consistency.
+
+## System software requirements
+
+  - clang-7 (for MUSIC), see [its prerequisites](https://github.com/swtv-kaist/MUSIC) for a complete list.
+  - clang-13
+  - GCC (tested with 7.5.0 and 9.4.0)
+
+The artifact has primarily been tested on Ubuntu 18.04.6 LTS and on
+Ubuntu 20.04.5 LTS.
+
+## Installing clang-13 on Ubuntu 20.04 LTS
+
+On Ubuntu 20.04 LTS, `clang-13` can be installed from
+https://apt.llvm.org/, using the following `/etc/apt/sources.list.d/llvm.list`
+
+```
+deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main
+deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main
+```
+
+# Installation
+
+We shall use a directory `$MUTHOME` to store all the source code and
+tools. Another directory `$EXPTHOME` will be used to store the
+generated files. We will use `$REPODIR` to refer to the directory in
+which this repository has been cloned.
+
+```
+mkdir $MUTHOME
+cd $MUTHOME
+
+$REPODIR/sys-prereqs.sh
+```
+
+This should result in output like:
+```
+*** GCC version
+gcc (Ubuntu 9.4.0-1ubuntu1~20.04.1) 9.4.0
+Copyright (C) 2019 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+*** Clang version
+Ubuntu clang version 13.0.1-++20220120110924+75e33f71c2da-1~exp1~20220120231001.58
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+InstalledDir: /usr/bin
+*** Python 3 version
+Python 3.8.10
+```
+
+If, instead, you get an error like this:
+
+```
+sys-prereqs.sh: line 12: clang-7: command not found
+```
+
+Install the prerequisite and rerun `sys-prereqs.sh`
+
+## Install MUSIC
+
+Run the `install-music.sh` script from within `$MUTDIR` to install the (MUSIC mutator)[https://github.com/swtv-kaist/MUSIC]:
+
+```
+$REPODIR/install-music.sh
+```
+
+This will clone MUSIC, and compile it (takes about 30 minutes).
+
+After the process, you should see after executing `ls`:
+
+```
+lib MUSIC
+```
+
+## Create and Install Python Virtual Environment
+
+The experimental scripts use [Parsl](https://github.com/Parsl/parsl),
+[Polars](https://www.pola.rs/) and [SciPy](https://scipy.org), and
+[Pycparser](https://github.com/eliben/pycparser).
+
+The `install-venv.sh` script creates a Python virtual environment and
+installs all the packages. Continue in `$MUTDIR`:
+
+```
+$REPODIR/install-venv.sh
+```
+
+This will create a directory called `parslenv`. Run the following
+commands in `$MUTDIR` to make sure everything has worked.
+
+```
+source parslenv/bin/activate
+$REPODIR/prereqs.py
+```
+
+You should see output that looks like this:
+
+```
+Virtual Env in /tmp/muthome/parslenv detected.
+Parsl version: 1.2.0
+scipy version: 1.9.1
+polars version: 0.14.9
+pycparser version: 2.21
+Assuming . is $MUTDIR, looking for pycparser-release_v2.21
+FOUND: pycparser-release_v2.21
+ALL OK
+```
+
+All commands below now run in this virtual environment.
+
+# Setup the experimental directory
+
+With the virtual environment all setup, run the following command in
+`$MUTDIR` to setup the directory that will contain all the
+experimental data (i.e. `$EXPTDIR`). This directory will grow to at
+least 45GB.  From within the virtual environment (assuming the
+ptx-semantics from ROCetta are in the path below):
+
+```
+$REPODIR/rocettaprep/setup_workdir.py --fake-includes pycparser-release_v2.21/utils/fake_libc_include/ $REPODIR/rocettaprep/ptx-semantics/v6.5/c/ptxc.c $EXPTDIR
+```
+
+You should see some output like this:
+```
+cpp_args: '-DPYCPARSER -D__STDC_VERSION__=199901L -I/tmp/muthome/pycparser-release_v2.21/utils/fake_libc_include'
+cpp_args: '-DPYCPARSER -D__STDC_VERSION__=199901L -I/tmp/muthome/pycparser-release_v2.21/utils/fake_libc_include'
+<command-line>: warning: "__STDC_VERSION__" redefined
+<built-in>: note: this is the location of the previous definition
+/home/sree/src/mutation-testing/Mutation-Based-Test-Generation/rocettaprep/ptxc/ptxc.h:1:9: warning: #pragma once in main file
+    1 | #pragma once
+      |         ^~~~
+...
+Setup done
+```
+
+If you do `ls $EXPTHOME`, you should see:
+
+```
+params.json  ptxc_fake_includes  samplers
+```
+
+Setup is now done!
+
+# The small set experiment
+
+First, we'll run the experiments on a small set of instructions,
+called the `smallset`. This is similar to the set used in the
+registered report and should be a quick check that everything is
+setup.
+
+## Initial code generation and compilation
+
+To create the tests, mutants, equivalence check drivers, mutation
+testing drivers, outputs, etc, run the following command.
+
+```
+$REPODIR/rocettaprep/build.sh $REPODIR/rocettaprep/smallset $EXPTDIR
+```
+
+Note that you may see errors like this:
+
+```
+abs_f64 mutants: Failed with code 2
+```
+
+This is okay since not all mutants are semantically valid and the C
+compiler will not compile them. The standard output and errors of the
+compilation failures are available in the `runinfo/` directory created
+by Parsl for inspection and debugging if necessary.
+
+## Run the small set experiment, normal flow
+
+Now, use the `run_expt.py` script to actually perform the experiment
+as described in the paper. Note the "@" in `--insn`
+
+```
+$REPODIR/rocettaprep/run_expt.py --insn @$REPODIR/rocettaprep/smallset $EXPTDIR smallsettest
+```
+
+This will run all the experiments for Table 2 and Table 3 and store
+the results in `$EXPTDIR/expt.smallsettest/*.csv` for later processing
+by the scripts. It should take no more than a few minutes.
+
+## Run the small set experiment to generate inputs from scratch
+
+The `run_expt.py` script can be used to generate inputs completely
+from scratch as described in the paper. Use the `--all` option and a
+different experiment name
+
+```
+$REPODIR/rocettaprep/run_expt.py --insn @$REPODIR/rocettaprep/smallset $EXPTDIR scratch --all
+```
+
+This will run all the experiments for Table 4 (input generation from
+scratch) and store the results in `$EXPTDIR/expt.smallsettest/*.csv`
+for later processing by the scripts. It should take no more than a few
+minutes.
 
 
-# To run script on standalone program:
-Use runner.py
-1. oracle program
-2. function name
-3. optional: test suite. If supplied, tool will attempt to boslter test suite with new inputs to cover survived mutations. Otherwise, the tool will create a new test suite in attempts to cover the total generated mutations.
-4. optional: compilation-info. this is a place for compilation flags to be supplied.
-For example, if the compilation command for the program is:
-gcc program.c -lm -o program
-Then "-lm" should be supplied as compilation info. 
-There are more flags listed in `python3 runner.py -help`
-Example command:
-`python3 runner.py fma_rn_ftz_f32.c execute_fma_rn_ftz_f32 f32_3.ssv --compilation-info="testutils.c -lm" --new-input-filename="new_inputs.txt"`
+# The full set experiment
 
-# To run script on ROCetta instructions:
-Use L2_runner.py
-Currently, many path values are hard coded into the script. Feel free to adjust as needed to run on different file structures. 
+Use the following commands to build and run the experiments for the
+full set of instructions.
 
-* There is a "yaml" or "no-yaml" flag on this script. If "yaml" is present, test suite data is taken from the instructions.yaml file. 
-Most uses should have the "no-yaml" flag, as it will utilize the gpusemtest python tools to extract instruction files. 
-To run:
-`python3 L2_runner.py <path to MUSIC> <path to fake_libc_headers> <yaml or no-yaml>`
+```
+$REPODIR/rocettaprep/build.sh $REPODIR/rocettaprep/all_insns_except_cc $EXPTDIR
+
+$REPODIR/rocettaprep/run_expt.py --insn @$REPODIR/rocettaprep/all_insns_except_cc $EXPTDIR fullset
+
+$REPODIR/rocettaprep/run_expt.py --insn @$REPODIR/rocettaprep/all_insns_except_cc --all $EXPTDIR allfullset
+```
+
+Note the first step here can take around 8 hours, and the other steps can take around 5 hours each.
