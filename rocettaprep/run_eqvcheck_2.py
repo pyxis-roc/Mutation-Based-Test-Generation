@@ -60,13 +60,13 @@ def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel
     workdir = wp.workdir / insn.working_dir
 
     mutants = muthelper.get_mutants(insn)
-    survivors = muthelper.get_survivors(insn, experiment)
 
     executor = CBMCExecutor(wp, experiment, 'all' if all_mutants else '', timeout_s = timeout_s)
 
     if all_mutants:
         run_on = [x['src'] for x in mutants]
     else:
+        survivors = muthelper.get_survivors(insn, experiment)
         run_on = survivors
 
     out = []

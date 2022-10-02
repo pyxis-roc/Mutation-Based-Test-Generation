@@ -72,9 +72,10 @@ CONVERTERS = {'float': bin_to_float,
               'unsigned int': bin_to_int}
 
 class CBMCOutput:
-    def __init__(self, wp, experiment):
+    def __init__(self, wp, experiment, subset = ''):
         self.wp = wp
         self.experiment = experiment
+        self.subset = subset
 
     def _get_trace_variables(self, trace):
         assignments = []
@@ -126,7 +127,11 @@ class CBMCOutput:
         return inputs, output
 
     def get_inputs(self, insn, mutant):
-        ofile = mutant.parent / f"cbmc_output.{mutant.name}.{self.experiment}.json"
+        if self.subset == 'all':
+            subset = '.all'
+        else:
+            subset = ''
+        ofile = mutant.parent / f"cbmc_output.{mutant.name}{subset}.{self.experiment}.json"
 
         with open(ofile, "r") as f:
             data = json.load(fp=f)
@@ -174,7 +179,7 @@ def run_gather_witnesses(wp, insn, experiment, all_subset = False):
     with open(workdir / f"eqvcheck_results.{subset}{experiment}.json", "r") as f:
         failed_mutants = json.load(fp=f)
 
-    info = CBMCOutput(wp, experiment)
+    info = CBMCOutput(wp, experiment, 'all' if all_subset else '')
 
     outputs = {}
     duplicates = 0

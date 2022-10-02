@@ -17,6 +17,7 @@ if __name__ == "__main__":
     p.add_argument("-o", "--output", help="Output file")
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
+    p.add_argument("--all", help="Use the all subset", action="store_true")
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -42,7 +43,7 @@ if __name__ == "__main__":
 
                 for r2source in ['eqvcheck', 'fuzzer_simple', 'fuzzer_custom']:
                     survivors[r2source] = set(muthelper.get_survivors(insn, args.experiment,
-                                                                      round2=True, r2source=r2source))
+                                                                      round2=True, r2source=r2source, all_subset = args.all))
 
             except FileNotFoundError as e:
                 print(f"WARNING: {e}")
