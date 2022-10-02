@@ -72,7 +72,7 @@ if __name__ == "__main__":
     out2 = []
     for i, r in out:
         # also -j
-        r2 = make_outputs(r, wp, insn, label=i)
+        r2 = make_outputs(r, wp, Insn(i), label=i)
         if get_ba_result(i, r2):
             out2.append(i)
 
