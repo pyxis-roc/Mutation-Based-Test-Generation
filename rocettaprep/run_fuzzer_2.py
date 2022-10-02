@@ -50,7 +50,6 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
     workdir = wp.workdir / insn.working_dir
 
     mutants = muthelper.get_mutants(insn)
-    survivors = muthelper.get_survivors(insn, experiment)
 
     executor = FuzzerExecutor(wp, experiment, 'all' if all_mutants else '', timeout_s = timeout_s)
 
@@ -67,7 +66,7 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
         # we still restrict this to non-equivalent mutants?
         run_on = [x['target'] for x in mutants if x['src'] in not_equivalent]
     else:
-        survivors = set(survivors)
+        survivors = set(muthelper.get_survivors(insn, experiment))
         run_on = [x['target'] for x in mutants if x['src'] in survivors and x['src'] in not_equivalent]
 
     out = []

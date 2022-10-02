@@ -16,6 +16,7 @@ if __name__ == "__main__":
     p.add_argument("-o", "--output", help="Output file")
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
+    p.add_argument("--all", help="Use the all subset", action="store_true")
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -25,10 +26,20 @@ if __name__ == "__main__":
         muthelper = get_mutation_helper(args.mutator, wp)
 
         out = {}
+        if args.all:
+            subset = 'all.'
+        else:
+            subset = ''
+
         for i in insns:
             insn = Insn(i)
             mutants = muthelper.get_mutants(insn)
-            survivors = muthelper.get_survivors(insn, args.experiment)
+
+            if args.all:
+                survivors = mutants
+            else:
+                survivors = muthelper.get_survivors(insn, args.experiment)
+
 
             out[i] = {'experiment': args.experiment,
                       'instruction': i,
@@ -36,17 +47,18 @@ if __name__ == "__main__":
 
             try:
                 for r2source in ['eqvcheck', 'fuzzer_simple', 'fuzzer_custom']:
-                    survivors2 = muthelper.get_survivors(insn, args.experiment, round2=True, r2source=r2source)
-                    out[i][f'round2.{r2source}'] = len(survivors2)
-            except FileNotFoundError:
+                    survivors2 = muthelper.get_survivors(insn, args.experiment, round2=True, r2source=r2source, all_subset = args.all)
+                    out[i][f'round2.{subset}{r2source}'] = len(survivors2)
+            except FileNotFoundError as e:
+                print(e)
                 pass
 
-            eqvfile = wp.workdir / insn.working_dir / f'eqvcheck_results.{args.experiment}.json'
+            eqvfile = wp.workdir / insn.working_dir / f'eqvcheck_results.{subset}{args.experiment}.json'
             if eqvfile.exists():
                 with open(eqvfile, "r") as f:
                     noneq_mutants = json.load(fp=f)
 
-            out[i][f'noneq_mutants'] = len(noneq_mutants)
+                out[i][f'noneq_mutants'] = len(noneq_mutants)
 
         df = pl.from_dicts(list(out.values()))
 

@@ -46,14 +46,19 @@ class Orchestrator:
         logfile = self.logdir / 'music_mutants.log'
         run_and_log(cmd, logfile)
 
-    def run_round2(self, r2source):
+    def run_round2(self, r2source, run_all = False):
         self._begin(f"round2 on {r2source}")
         cmd = [str(MYPATH / RUN_MUTANTS), '--insn', self.insn,
                '--round2',
                '--r2source', r2source,
                self.workdir, self.experiment]
 
-        logfile = self.logdir / f'round2.{r2source}.log'
+        note = ""
+        if run_all:
+            cmd.append("--all")
+            note = ".all"
+
+        logfile = self.logdir / f'round2{note}.{r2source}.log'
         run_and_log(cmd, logfile)
 
     def run_fuzzer(self, fuzzer, run_all=False):
@@ -101,16 +106,21 @@ class Orchestrator:
 
         run_and_log(cmd, logfile)
 
-    def run_gather_witnesses(self):
+    def run_gather_witnesses(self, run_all = False):
         self._begin(f"run_gather_witnesses")
         cmd = [str(MYPATH / 'run_gather_witnesses.py'),
                '--insn', self.insn,
                self.workdir, self.experiment]
 
-        logfile = self.logdir / f'gather_witnesses.log'
+        note = ""
+        if run_all:
+            cmd.append("--all")
+            note = ".all"
+
+        logfile = self.logdir / f'gather_witnesses{note}.log'
         run_and_log(cmd, logfile)
 
-    def run_collect_fuzzer(self, fuzzer):
+    def run_collect_fuzzer(self, fuzzer, run_all = False):
         self._begin(f"collect_fuzzer {fuzzer}")
         cmd = [str(MYPATH / 'run_collect_fuzzer.py'),
                '--insn', self.insn,
@@ -118,29 +128,42 @@ class Orchestrator:
                '--fuzzer', fuzzer,
                self.workdir, self.experiment]
 
-        #TODO: This does not distinguish between --all runs?
-        logfile = self.logdir / f'collect_fuzzer.{fuzzer}.log'
+        note = ""
+        if run_all:
+            cmd.append("--all")
+            note = ".all"
+
+        logfile = self.logdir / f'collect_fuzzer{note}.{fuzzer}.log'
         run_and_log(cmd, logfile)
 
-    def gather_mutant_stats(self):
+    def gather_mutant_stats(self, run_all = False):
         self._begin(f"gather_mutant_stats")
         cmd = [str(MYPATH / 'stats_mutants.py'),
                '--insn', self.insn,
                '-o', str(self.logdir / f'stats_mutants.{self.experiment}.csv'),
                self.workdir, self.experiment]
 
-        #TODO: This does not distinguish between --all runs?
-        logfile = self.logdir / f'mutant_stats.log'
+        note = ""
+        if run_all:
+            cmd.append("--all")
+            note = ".all"
+
+        logfile = self.logdir / f'mutant_stats{note}.log'
         run_and_log(cmd, logfile)
 
-    def gather_survivor_stats(self):
+    def gather_survivor_stats(self, run_all = False):
         self._begin(f"gather_survivor_stats")
         cmd = [str(MYPATH / 'stats_survivors.py'),
                '--insn', self.insn,
                '-o', str(self.logdir / f'stats_survivors.{self.experiment}.txt'),
                self.workdir, self.experiment]
 
-        logfile = self.logdir / f'survivor_stats.log'
+        note = ""
+        if run_all:
+            cmd.append("--all")
+            note = ".all"
+
+        logfile = self.logdir / f'survivor_stats{note}.log'
         run_and_log(cmd, logfile)
 
     def gather_input_stats(self):
@@ -150,7 +173,7 @@ class Orchestrator:
                '-o', str(self.logdir / f'stats_inputs.{self.experiment}.csv'),
                self.workdir, self.experiment]
 
-        #TODO: This does not distinguish between --all runs?
+        # the command gathers all as well.
         logfile = self.logdir / f'stats_inputs.log'
         run_and_log(cmd, logfile)
 
@@ -162,7 +185,7 @@ class Orchestrator:
                '--os', str(self.logdir / f'stats_timing_summary.{self.experiment}.csv'),
                self.workdir, self.experiment]
 
-        #TODO: This does not distinguish between --all runs?
+        # the command gathers all as well
         logfile = self.logdir / f'stats_timing.log'
         run_and_log(cmd, logfile)
 
@@ -207,27 +230,29 @@ if __name__ == "__main__":
     print("Started at", start)
     print(f"PYTHONPATH set to {os.environ['PYTHONPATH']}")
 
-    if not args.skip_mutants: x.run_mutants()
-    if not args.skip_eqvcheck: x.run_eqvcheck()
+    if not (args.skip_mutants or args.all):
+        x.run_mutants()
+
+    if not args.skip_eqvcheck: x.run_eqvcheck(run_all = args.all)
 
     if not args.skip_fuzzers:
         x.run_fuzzer('simple', run_all = args.all)
         x.run_fuzzer('custom', run_all = args.all)
 
-    if not args.skip_eqvcheck: x.run_gather_witnesses()
+    if not args.skip_eqvcheck: x.run_gather_witnesses(run_all = args.all)
     if not args.skip_fuzzers:
-        x.run_collect_fuzzer('simple')
-        x.run_collect_fuzzer('custom')
+        x.run_collect_fuzzer('simple', run_all = args.all)
+        x.run_collect_fuzzer('custom', run_all = args.all)
 
     if not args.skip_round2:
-        # TODO: all?
-        x.run_round2('eqvcheck')
-        x.run_round2('fuzzer_simple')
-        x.run_round2('fuzzer_custom')
+        x.run_round2('eqvcheck', run_all = args.all)
+        x.run_round2('fuzzer_simple', run_all = args.all)
+        x.run_round2('fuzzer_custom', run_all = args.all)
 
     if not args.skip_stats:
-        x.gather_mutant_stats()
-        x.gather_survivor_stats()
+        x.gather_mutant_stats(run_all = args.all)
+
+        x.gather_survivor_stats(run_all = args.all)
         x.gather_input_stats()
         x.gather_timing_stats()
 
