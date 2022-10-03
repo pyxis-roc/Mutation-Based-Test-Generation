@@ -5,7 +5,7 @@ import polars as pl
 from results_summary_pipeline import texify
 
 def gen_table(data, output, cols = ["series", "min", "mean", "std", "max", "count"],
-              coltitles = ["", "Min.", "Median", "Mean", "Std. Dev.", "Max.", "Count"]):
+              coltitles = ["", "Min.", "Mean", "Std. Dev.", "Max.", "Count"]):
     out = [coltitles]
     for r in data[cols].rows():
         o = [r[0]]
@@ -51,10 +51,9 @@ if __name__ == "__main__":
         dt = d[['total', 'unique']].transpose(include_header=True,
                                               column_names=d['describe'])
         dt = dt.with_column((n + " " + pl.col('column')).alias('series'))
-        print(dt)
         out = out.vstack(dt)
 
-    print(gen_table(out, args.output_gen, ["series", "min", "mean", "std", "max"],
-                    ["", "Min.", "Median", "Mean", "Std. Dev.", "Max."]))
+    gen_table(out, args.output_gen, ["series", "min", "median", "mean", "std", "max"],
+              ["", "Min.", "Median", "Mean", "Std. Dev.", "Max."])
 
 
