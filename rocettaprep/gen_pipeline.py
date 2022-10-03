@@ -3,11 +3,11 @@
 import argparse
 import polars as pl
 import ci
-
+from pathlib import Path
 if __name__ == "__main__":
-    from setup_workdir import WorkParams
+    #from setup_workdir import WorkParams
 
-    p = argparse.ArgumentParser(description="Generate Table 1")
+    p = argparse.ArgumentParser(description="Generate Pipeline statistics")
 
     p.add_argument("workdir", help="Work directory")
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
@@ -15,9 +15,11 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    wp = WorkParams.load_from(args.workdir)
+    #wp = WorkParams.load_from(args.workdir)
 
-    expt_dir = wp.workdir / f'expt.{args.experiment}'
+    wp = Path(args.workdir)
+
+    expt_dir = wp / f'expt.{args.experiment}'
 
     if not expt_dir.exists():
         print(f"ERROR: {expt_dir} does not exist", file=sys.stderr)
@@ -55,7 +57,6 @@ if __name__ == "__main__":
         pl.col('time_ns_count').apply(lambda c: ci.critlevel(c, 95)).alias("_time_ns_critlevel"),
     ])
 
-    #TODO: ci_95
     stats = stats.with_columns(
         [
             (pl.col('mutants') - pl.col('survivors')).alias("Kill #1"),
@@ -73,9 +74,11 @@ if __name__ == "__main__":
     # for now, print out individual kills, but in final version
     # unless kills differ, remove individual kill columns.
 
-    tbl1 = stats[["instruction", "mutants", "Kill #1", "Same", 'Kill.EC #2', 'Kill.FS #2', 'Kill.FC #2', 'Left.EC', 'Left.FS', 'Left.FC', 'time_ms_avg', 'time_ms_ci95']]
+    pipeline_stats = stats[["instruction", "mutants", "Kill #1", "Same", 'Kill.EC #2', 'Kill.FS #2', 'Kill.FC #2', 'Left.EC', 'Left.FS', 'Left.FC', 'time_ms_avg', 'time_ms_ci95']]
 
     if args.output:
-        tbl1.write_csv(args.output)
+        pipeline_stats.write_csv(args.output)
     else:
-        print(tbl1)
+        print(pipeline_stats)
+
+
