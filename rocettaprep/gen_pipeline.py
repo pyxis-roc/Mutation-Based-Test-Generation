@@ -76,6 +76,8 @@ if __name__ == "__main__":
 
     pipeline_stats = stats[["instruction", "mutants", "Kill #1", "Same", 'Kill.EC #2', 'Kill.FS #2', 'Kill.FC #2', 'Left.EC', 'Left.FS', 'Left.FC', 'time_ms_avg', 'time_ms_ci95']]
 
+    print("Survivors", stats["survivors"].sum())
+
     if args.output:
         pipeline_stats.write_csv(args.output)
     else:
