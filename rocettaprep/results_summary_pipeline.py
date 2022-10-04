@@ -35,6 +35,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Summarize data produced by gen_pipeline.py")
 
     p.add_argument("pipelinestatscsv", help="CSV produced by gen_pipeline.py")
+    p.add_argument("-o", "--output", help="Output table" , default="pipeline_stats.tex")
 
     args = p.parse_args()
 
@@ -75,7 +76,7 @@ if __name__ == "__main__":
            'kill2_ratio_ec', 'kill2_ratio_fs', 'kill2_ratio_fc',
         'left_ratio_ec', 'left_ratio_fs', 'left_ratio_fc']].transpose(include_header=True, column_names=x['describe'])
 
-    gen_table(x[['column', 'min', 'median', 'mean', 'std', 'max']], "pipeline_stats.tex")
+    gen_table(x[['column', 'min', 'median', 'mean', 'std', 'max']], args.output)
 
     # Killed #1 + Same + Kill.EC #2 + Left.EC = Mutants
     ec_check = stats.with_columns([(pl.col('mutants') -
