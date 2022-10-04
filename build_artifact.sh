@@ -5,7 +5,8 @@ set -e
 DST=insn-testgen-artifact
 
 mkdir -p $DST
-cp -a Mutation-Based-Test-Generation $DST
+cd Mutation-Based-Test-Generation &&  git archive --prefix=Mutation-Based-Test-Generation/ HEAD | tar xf - -C ../$DST/
+cd ..
 cp -a ROCetta-ptx-semantics $DST
 cp -a Data $DST
 
