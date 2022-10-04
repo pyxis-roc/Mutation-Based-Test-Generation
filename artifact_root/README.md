@@ -27,7 +27,7 @@ in this document were obtained from a 32-core AMD EPYC machine.
 If you have a Docker/Podman setup, you can use the enclosed
 `Containerfile` to setup a pristine, known-to-work environment with
 minimum fuss. If you decide to do that, follow the instructions in
-`README.Container` file, skip the next section and resume at MUSIC
+`README.container` file, skip the next section and resume at MUSIC
 Installation.
 
 
@@ -73,7 +73,7 @@ If you instead encounter errors, read the [REQUIREMENTS](REQUIREMENTS.md) file t
 [From this steps onwards, the commands are common to both the
 container environment and a standalone environment.]
 
-First, install all MUSIC pre-requisites (from https://github.com/swtv-kaist/MUSIC, an abridged list is below):
+First, install all MUSIC pre-requisites (from https://github.com/swtv-kaist/MUSIC, an abridged list is below. These are already installed in the container):
 
 ```
 sudo apt-get install clang-7 clang-tools-7 libclang-common-7-dev libclang-7-dev libclang1-7 clang-format-7 python-clang-7 libllvm-7-ocaml-dev libllvm7 llvm-7 llvm-7-dev llvm-7-runtime libz-dev
@@ -215,9 +215,20 @@ for later processing by the scripts for the single instruction
 full `smallset`, it will take much longer, on the order of an hour or
 so.
 
-## Graphing the Data
+## Tabulating the Data
 
-TODO.
+To generate the tables used in the experiment, run the following commands:
+
+```
+# for the normal pipeline flow tables
+./Mutation-Based-Test-Generation/rocettaprep/paper_results.sh exptdata smallset-test
+
+# for the all experiment
+./Mutation-Based-Test-Generation/rocettaprep/paper_results.sh exptdata test-scratch
+```
+
+This should result in a number of TeX files in the current directory
+that are used with minor formatting changes in the paper.
 
 ## The full set experiment
 
@@ -239,8 +250,8 @@ Note the first step here can take around 8 hours, and the second step
 can take around 5 hours.
 
 If you decide to run the `--all` portion, make sure you have around
-500GB of disk space, and plenty of time (around 8 hours for
-equivalence check alone!).
+500GB of disk space, and plenty of time (the experiment has not
+concluded even after 2 days of running!).
 
 ```
 ./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --insn @./Mutation-Based-Test-Generation/rocettaprep/all_insns_except_cc --all exptdata all-fullset
