@@ -3,11 +3,12 @@
 import argparse
 import polars as pl
 import ci
+from pathlib import Path
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
 
-    p = argparse.ArgumentParser(description="Generate Table 3, equivalence checker stats")
+    p = argparse.ArgumentParser(description="Generate input stats for equivalence checker and fuzzers")
 
     p.add_argument("workdir", help="Work directory")
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
@@ -18,9 +19,9 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    wp = WorkParams.load_from(args.workdir)
+    wp = Path(args.workdir) #WorkParams.load_from(args.workdir)
 
-    expt_dir = wp.workdir / f'expt.{args.experiment}'
+    expt_dir = wp / f'expt.{args.experiment}'
 
     if not expt_dir.exists():
         print(f"ERROR: {expt_dir} does not exist", file=sys.stderr)
@@ -40,6 +41,13 @@ if __name__ == "__main__":
 
         sys.exit(1)
 
+    timings_detail_file = expt_dir / f'stats_timing.{args.experiment}.csv'
+    if not timings_detail_file.exists():
+        print(f"ERROR: {timings_detail_file} does not exist, make sure you've run stats_timing.py",
+              file=sys.stderr)
+
+        sys.exit(1)
+
     if args.src.startswith('fuzzer'):
         inpsrc = 'lib' + args.src
     else:
@@ -53,14 +61,23 @@ if __name__ == "__main__":
 
     stats = pl.read_csv(stats_file).filter(pl.col("source") == inpsrc)
     timing = pl.read_csv(timing_file)
+    timing_details = pl.read_csv(timings_detail_file)
 
     eqvcheck_timing = timing.filter(pl.col("source") == src)
     stats = stats.join(eqvcheck_timing, on=["experiment", "instruction"])
 
+    timing_details = timing_details.filter(pl.col("source") == src)
+    timeouts = timing_details.filter(pl.col('time_ns').is_null())
+    timeouts = timeouts.groupby(["experiment", "instruction"]).agg([pl.count().alias("timeouts")])
+
+    print("Timeouts", src, timeouts['timeouts'].sum())
+    timeouts.write_csv(f"timeouts.{src}.{args.experiment}.csv")
+    print(f"Wrote timeouts data to timeouts.{src}.{args.experiment}.csv")
+
     stats = stats.with_columns([
         pl.col('time_ns_count').apply(lambda c: ci.critlevel(c, 95)).alias("_time_ns_critlevel"),
     ])
-    print(stats)
+
     stats = stats.with_columns(
         [
             (pl.col('time_ns_avg') / 1E6).alias("time_ms_avg"),
@@ -71,5 +88,6 @@ if __name__ == "__main__":
 
     if args.output:
         tbl.write_csv(args.output)
+        print(f"Wrote data to {args.output}")
     else:
         print(tbl)
