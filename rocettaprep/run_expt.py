@@ -13,10 +13,12 @@ if False:
     RUN_MUTANTS = 'run_mutants.py'
     RUN_EQVCHECK = 'run_eqvcheck.py'
     RUN_FUZZER = 'run_fuzzer.py'
+    RUN_BUILD_FUZZER_BINARIES = 'build_fuzzer_binaries.py'
 else:
     RUN_MUTANTS = 'run_mutants_2.py'
     RUN_EQVCHECK = 'run_eqvcheck_2.py'
     RUN_FUZZER = 'run_fuzzer_2.py'
+    RUN_BUILD_FUZZER_BINARIES = 'build_fuzzer_binaries.py'
 
 def run_and_log(cmd, logfile):
     with open(logfile, "w") as f:
@@ -104,6 +106,22 @@ class Orchestrator:
         cmd.extend([self.workdir, self.experiment])
         logfile = self.logdir / f'eqvcheck{note}.log'
 
+        run_and_log(cmd, logfile)
+
+    def run_build_fuzzer_binaries(self, fuzzer, run_all = False):
+        self._begin(f"build_fuzzer_binaries {fuzzer}")
+        cmd = [str(MYPATH / RUN_BUILD_FUZZER_BINARIES),
+               '--insn', self.insn,
+               '--mutator', self.mutator,
+               '--fuzzer', fuzzer,
+               self.workdir, self.experiment]
+
+        note = ""
+        if run_all:
+            cmd.append("--all")
+            note = ".all"
+
+        logfile = self.logdir / f'build_fuzzer_binaries{note}.{fuzzer}.log'
         run_and_log(cmd, logfile)
 
     def run_gather_witnesses(self, run_all = False):
@@ -236,6 +254,9 @@ if __name__ == "__main__":
     if not args.skip_eqvcheck: x.run_eqvcheck(run_all = args.all)
 
     if not args.skip_fuzzers:
+        x.run_build_fuzzer_binaries('simple', run_all = args.all)
+        x.run_build_fuzzer_binaries('custom', run_all = args.all)
+
         x.run_fuzzer('simple', run_all = args.all)
         x.run_fuzzer('custom', run_all = args.all)
 
