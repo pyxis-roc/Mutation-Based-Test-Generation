@@ -12,10 +12,14 @@ if __name__ == "__main__":
     p.add_argument("workdir", help="Work directory")
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
     p.add_argument("-o", "--output", help="Output file")
+    p.add_argument("--all", help="Process the all subset", action="store_true")
 
     args = p.parse_args()
 
-    #wp = WorkParams.load_from(args.workdir)
+    if args.all:
+        subset = "all."
+    else:
+        subset = ""
 
     wp = Path(args.workdir)
 
@@ -50,31 +54,39 @@ if __name__ == "__main__":
     stats = pl.read_csv(stats_file)
     timing = pl.read_csv(timing_file)
 
-    mutant_timing = timing.filter(pl.col("source") == "mutation")
-    stats = stats.join(mutant_timing, on=["experiment", "instruction"])
+    if not args.all:
+        # mutants do not run when --all is specified
+        # so only collect timing data when --all is not specified
+        mutant_timing = timing.filter(pl.col("source") == "mutation")
+        stats = stats.join(mutant_timing, on=["experiment", "instruction"])
 
-    stats = stats.with_columns([
-        pl.col('time_ns_count').apply(lambda c: ci.critlevel(c, 95)).alias("_time_ns_critlevel"),
-    ])
+        stats = stats.with_columns([
+            pl.col('time_ns_count').apply(lambda c: ci.critlevel(c, 95)).alias("_time_ns_critlevel"),
+        ])
+
+        stats = stats.with_columns([(pl.col('time_ns_avg') / 1E6).alias("time_ms_avg"),
+                                    pl.struct(["time_ns_count", "time_ns_stdev",
+                                               "_time_ns_critlevel"]).apply(lambda x: ci.calc_ci_2(x['_time_ns_critlevel'], x['time_ns_stdev'] / 1E6, x['time_ns_count'])).alias("time_ms_ci95")])
+        timing_fields = ['time_ms_avg', 'time_ms_ci95']
+    else:
+        timing_fields = []
 
     stats = stats.with_columns(
         [
             (pl.col('mutants') - pl.col('survivors')).alias("Kill #1"),
             (pl.col('survivors') - pl.col('noneq_mutants')).alias("Same"),
-            (pl.col('noneq_mutants') - pl.col('round2.eqvcheck')).alias("Kill.EC #2"),
-            (pl.col('noneq_mutants') - pl.col('round2.fuzzer_simple')).alias("Kill.FS #2"),
-            (pl.col('noneq_mutants') - pl.col('round2.fuzzer_custom')).alias("Kill.FC #2"),
-            (pl.col('round2.eqvcheck')).alias("Left.EC"),
-            (pl.col('round2.fuzzer_simple')).alias("Left.FS"),
-            (pl.col('round2.fuzzer_custom')).alias("Left.FC"),
-            (pl.col('time_ns_avg') / 1E6).alias("time_ms_avg"),
-            pl.struct(["time_ns_count", "time_ns_stdev", "_time_ns_critlevel"]).apply(lambda x: ci.calc_ci_2(x['_time_ns_critlevel'], x['time_ns_stdev'] / 1E6, x['time_ns_count'])).alias("time_ms_ci95")
+            (pl.col('noneq_mutants') - pl.col(f'round2.{subset}eqvcheck')).alias("Kill.EC #2"),
+            (pl.col('noneq_mutants') - pl.col(f'round2.{subset}fuzzer_simple')).alias("Kill.FS #2"),
+            (pl.col('noneq_mutants') - pl.col(f'round2.{subset}fuzzer_custom')).alias("Kill.FC #2"),
+            (pl.col(f'round2.{subset}eqvcheck')).alias("Left.EC"),
+            (pl.col(f'round2.{subset}fuzzer_simple')).alias("Left.FS"),
+            (pl.col(f'round2.{subset}fuzzer_custom')).alias("Left.FC"),
         ])
 
     # for now, print out individual kills, but in final version
     # unless kills differ, remove individual kill columns.
 
-    pipeline_stats = stats[["instruction", "mutants", "Kill #1", "Same", 'Kill.EC #2', 'Kill.FS #2', 'Kill.FC #2', 'Left.EC', 'Left.FS', 'Left.FC', 'time_ms_avg', 'time_ms_ci95']]
+    pipeline_stats = stats[["instruction", "mutants", "Kill #1", "Same", 'Kill.EC #2', 'Kill.FS #2', 'Kill.FC #2', 'Left.EC', 'Left.FS', 'Left.FC'] + timing_fields]
 
     print("Survivors", stats["survivors"].sum())
 
