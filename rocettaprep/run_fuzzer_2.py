@@ -40,7 +40,7 @@ def finish_fuzzer(workdir, fuzzer, all_suffix, experiment, programs=[], inputs=[
         json.dump(dict(results), fp=f)
 
 @join_app
-def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 'simple', parallel = True, timeout_s = 90):
+def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 'simple', parallel = True, timeout_s = 90, ignore_eqvcheck = False):
     import json
     from roctest import InsnTest
     from fuzzer_executor import FuzzerExecutor
@@ -58,9 +58,13 @@ def run_fuzzer(wp, insn, experiment, muthelper, all_mutants = False, fuzzer = 's
     else:
         all_suffix = ''
 
-    # equivalence checker must be run before fuzzer.
-    with open(workdir / f"eqvcheck_results{all_suffix}.{experiment}.json", "r") as f:
-        not_equivalent = set(json.load(fp=f))
+    if not ignore_eqvcheck:
+        # equivalence checker must be run before fuzzer.
+        with open(workdir / f"eqvcheck_results{all_suffix}.{experiment}.json", "r") as f:
+            not_equivalent = set(json.load(fp=f))
+    else:
+        # consider everything to be not_equivalent if we don't have data from equivalence checker
+        not_equivalent = set([x['src'] for x in mutants])
 
     if all_mutants:
         # we still restrict this to non-equivalent mutants?
@@ -93,7 +97,9 @@ if __name__ == "__main__":
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
-    p.add_argument("--all", help="Run the fuzzer on all mutants, not just survivors (NOT RECOMMENDED)", action="store_true")
+    p.add_argument("--all", help="Run the fuzzer on all non-equivalent mutants, not just survivors", action="store_true")
+    p.add_argument("--ignore-eqvcheck", help="Ignore equivalence checker results, and run on all mutants (NOT RECOMMENDED)", action="store_true")
+
     p.add_argument("--fuzzer", help="Choose variant of fuzzer to run",
                    choices=['simple', 'custom'], default='simple')
     p.add_argument("--timeout", help="Timeout to use (seconds)",
@@ -114,7 +120,7 @@ if __name__ == "__main__":
         out = []
         for i in insns:
             insn = Insn(i)
-            out.append(run_fuzzer(wp, insn, args.experiment, muthelper, all_mutants = args.all, fuzzer=args.fuzzer, parallel = True, timeout_s = args.timeout))
+            out.append(run_fuzzer(wp, insn, args.experiment, muthelper, all_mutants = args.all, fuzzer=args.fuzzer, parallel = True, timeout_s = args.timeout, ignore_eqvcheck = args.ignore_eqvcheck))
 
         for i, o in zip(insns, out):
             print(i)

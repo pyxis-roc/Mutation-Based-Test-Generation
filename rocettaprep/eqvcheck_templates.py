@@ -63,6 +63,8 @@ class TyHelper:
             return 'Q'
         elif self.tyname == 'int64_t':
             return 'q'
+        elif self.tyname == 'struct cc_register':
+            return 'i' # {int cf}
         else:
             raise NotImplementedError(f"Need struct unpacker for {self.tyname}")
 

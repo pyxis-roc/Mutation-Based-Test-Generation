@@ -15,3 +15,5 @@
 #include "uint16_sampler.h"
 #include "uint32_sampler.h"
 #include "uint64_sampler.h"
+
+#include "ccreg_sampler.h"
