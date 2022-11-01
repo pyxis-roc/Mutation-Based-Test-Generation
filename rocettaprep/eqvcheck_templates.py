@@ -91,6 +91,23 @@ class CCRegTyHelper(TyHelper):
     def check_eqv(self, v1, v2):
         return f"{v1}.cf == {v2}.cf"
 
+class StructRetvalTyHelper(TyHelper):
+    def __init__(self, tyname):
+        self.tyname = tyname
+
+    def domain_restrict(self, v):
+        return None
+
+    def nondet_fn(self):
+        return f"nondet_{self.tyname.replace(' ','_')}()"
+
+    def nondet_fn_decl(self):
+        return f"{self.tyname} {self.nondet_fn()};"
+
+    def check_eqv(self, v1, v2):
+        # TODO
+        return f"{v1} == {v2}"
+
 
 ty_helpers = {}
 ty_helpers["float"] = FloatTyHelper('float')
@@ -115,7 +132,11 @@ class EqvCheckTemplate:
 
         out = []
         for i in dty:
-            tyh = ty_helpers[i]
+            if i.startswith('struct retval_'):
+                tyh = StructRetvalTyHelper(i)
+            else:
+                tyh = ty_helpers[i]
+
             out.append(tyh.nondet_fn_decl())
 
         out.append("\n")
@@ -124,7 +145,10 @@ class EqvCheckTemplate:
     def get_ret_type(self):
         ty = insn_info[self.insn.insn]['output_types']
         if len(ty) > 1:
-            assert len(ty) == 2 and ty[1] == "cc_reg", ty[1]
+            if len(ty) == 2 and ty[1] == "pred":
+                return f"struct retval_{self.insn.insn}"
+
+            assert (ty[1] == "cc_reg" or ty[1] == "pred"), ty[1]
 
         return ty_conv[ty[0]]
 
@@ -154,6 +178,8 @@ class EqvCheckTemplate:
 
         if rty in ty_helpers:
             return ty_helpers[rty].check_eqv(rv_orig, rv_mut)
+        elif rty.startswith('struct retval_'):
+            return StructRetvalTyHelper(rty).check_eqv(rv_orig, rv_mut)
         else:
             raise NotImplementedError(f"Checks for return type not implemented: {rty}")
 
@@ -163,11 +189,14 @@ class EqvCheckTemplate:
         oty = self.get_output_types()[1:]
         out = []
         for idx, ty in enumerate(oty, 1):
-            if ty in ty_helpers:
+            if ty == 'struct cc_register':
                 # strip the & in front
                 tyh = ty_helpers[ty]
                 out.append(template(tyh.check_eqv(orig_call_args[idx+out_offset-1][1:],
                                                   mut_call_args[idx+out_offset-1][1:])))
+            elif ty == 'unsigned int':
+                # output is in a struct, so will be checked separately
+                pass
             else:
                 raise NotImplementedError(f"Checks for out type not implemented: {ty}")
 
@@ -234,6 +263,9 @@ class EqvCheckTemplate:
                 out.append(f'  {oty} out{i}, mut_out{i};')
                 origargs.append(f"&out{i}")
                 mutargs.append(f"&mut_out{i}")
+            elif oty == 'unsigned int': # pred x pred
+                assert rty.startswith('struct retval_'), rty
+                pass
             else:
                 raise NotImplementedError(f"{oty} not yet handled")
 
