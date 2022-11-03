@@ -3,7 +3,7 @@
 import argparse
 from rocprepcommon import *
 from build_single_insn import Insn
-from eqvcheck_templates import insn_info, ty_helpers, ty_conv
+from eqvcheck_templates import insn_info, ty_helpers, ty_conv, StructRetvalTyHelper
 from mutate import get_mutation_helper, get_mutators
 import shutil
 from build_single_insn import PTXSemantics
@@ -26,6 +26,10 @@ class FuzzerTemplateSimple:
     def get_ret_type(self):
         t = insn_info[self.insn.insn]['output_types']
         if len(t) > 1:
+            if len(t) == 2 and t[1] == "pred":
+                self.output_types = list([ty_conv[tt] for tt in t])
+                return f"struct retval_{self.insn.insn}"
+
             assert len(t) == 2 and t[1] == "cc_reg", t[1]
 
         return ty_conv[t[0]]
@@ -39,6 +43,8 @@ class FuzzerTemplateSimple:
 
         if rty in ty_helpers:
             return ty_helpers[rty].check_eqv(rv_orig, rv_mut)
+        elif rty.startswith('struct retval_'):
+            return StructRetvalTyHelper(rty, self.output_types).check_eqv(rv_orig, rv_mut)
         else:
             raise NotImplementedError(f"Checks for return type not implemented: {rty}")
 
@@ -69,11 +75,14 @@ class FuzzerTemplateSimple:
         oty = self.get_output_types()[1:]
         out = []
         for idx, ty in enumerate(oty, 1):
-            if ty in ty_helpers:
+            if ty == 'struct cc_register':
                 # strip the & in front
                 tyh = ty_helpers[ty]
                 out.append(template(tyh.check_eqv(orig_call_args[idx+out_offset-1][1:],
                                                   mut_call_args[idx+out_offset-1][1:])))
+            elif ty == 'unsigned int':
+                # output is in a struct, so will be checked separately
+                pass
             else:
                 raise NotImplementedError(f"Checks for out type not implemented: {ty}")
 
@@ -138,6 +147,8 @@ class FuzzerTemplateSimple:
                 out.append(f'  {oty} out{i}, mut_out{i};')
                 callargs.append(f"&out{i}")
                 mutargs.append(f"&mut_out{i}")
+            elif oty == 'unsigned int': # pred x pred
+                assert rty.startswith('struct retval_'), rty
             else:
                 raise NotImplementedError(f"{oty} not yet handled")
 

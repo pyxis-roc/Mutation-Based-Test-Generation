@@ -91,9 +91,20 @@ class CCRegTyHelper(TyHelper):
     def check_eqv(self, v1, v2):
         return f"{v1}.cf == {v2}.cf"
 
+ty_helpers = {}
+ty_helpers["float"] = FloatTyHelper('float')
+ty_helpers["double"] = FloatTyHelper('double')
+ty_helpers.update(dict([(ty, TyHelper(ty)) for ty in [
+    "int8_t", "uint8_t", "uint16_t", "int16_t",
+    "int64_t", "uint64_t", "int32_t", "uint32_t",
+    "unsigned int"]]))
+
+ty_helpers["struct cc_register"] = CCRegTyHelper("struct cc_register")
+
 class StructRetvalTyHelper(TyHelper):
-    def __init__(self, tyname):
+    def __init__(self, tyname, output_types):
         self.tyname = tyname
+        self.output_types = output_types
 
     def domain_restrict(self, v):
         return None
@@ -105,19 +116,9 @@ class StructRetvalTyHelper(TyHelper):
         return f"{self.tyname} {self.nondet_fn()};"
 
     def check_eqv(self, v1, v2):
-        # TODO
-        return f"{v1} == {v2}"
-
-
-ty_helpers = {}
-ty_helpers["float"] = FloatTyHelper('float')
-ty_helpers["double"] = FloatTyHelper('double')
-ty_helpers.update(dict([(ty, TyHelper(ty)) for ty in [
-    "int8_t", "uint8_t", "uint16_t", "int16_t",
-    "int64_t", "uint64_t", "int32_t", "uint32_t",
-    "unsigned int"]]))
-
-ty_helpers["struct cc_register"] = CCRegTyHelper("struct cc_register")
+        out = " && ".join(["(%s)" % (ty_helpers[t].check_eqv(f"{v1}.out{i}",
+                                                             f"{v2}.out{i}"),) for i, t in enumerate(self.output_types)])
+        return out
 
 class EqvCheckTemplate:
     def __init__(self, insn, mutated_fn):
@@ -133,7 +134,7 @@ class EqvCheckTemplate:
         out = []
         for i in dty:
             if i.startswith('struct retval_'):
-                tyh = StructRetvalTyHelper(i)
+                tyh = StructRetvalTyHelper(i, self.output_types)
             else:
                 tyh = ty_helpers[i]
 
@@ -146,9 +147,10 @@ class EqvCheckTemplate:
         ty = insn_info[self.insn.insn]['output_types']
         if len(ty) > 1:
             if len(ty) == 2 and ty[1] == "pred":
+                self.output_types = list([ty_conv[tt] for tt in ty])
                 return f"struct retval_{self.insn.insn}"
 
-            assert (ty[1] == "cc_reg" or ty[1] == "pred"), ty[1]
+            assert (ty[1] == "cc_reg"), ty[1]
 
         return ty_conv[ty[0]]
 
@@ -179,7 +181,7 @@ class EqvCheckTemplate:
         if rty in ty_helpers:
             return ty_helpers[rty].check_eqv(rv_orig, rv_mut)
         elif rty.startswith('struct retval_'):
-            return StructRetvalTyHelper(rty).check_eqv(rv_orig, rv_mut)
+            return StructRetvalTyHelper(rty, self.output_types).check_eqv(rv_orig, rv_mut)
         else:
             raise NotImplementedError(f"Checks for return type not implemented: {rty}")
 
