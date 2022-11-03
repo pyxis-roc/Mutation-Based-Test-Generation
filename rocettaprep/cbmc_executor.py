@@ -13,11 +13,12 @@ CBMC_RC_CONV_ERROR = 6
 CBMC_RC_VERIFICATION_UNSAFE = 10 # also conversion error when writing to other file.
 
 class CBMCExecutor:
-    def __init__(self, wp, experiment, subset = '', timeout_s = 90):
+    def __init__(self, wp, experiment, subset = '', timeout_s = 90, json_ui = True):
         self.wp = wp
         self.experiment = experiment
         self.subset = subset
         self.timeout_s = timeout_s
+        self.json_ui = json_ui
 
     def run(self, insn, mutant):
         xinc = list(zip(itertools.repeat("-I"), self.wp.include_dirs))
@@ -27,10 +28,20 @@ class CBMCExecutor:
         else:
             subset = ''
 
-        ofile = mutant.parent / f"cbmc_output.{mutant.name}.{subset}{self.experiment}.json"
+        if self.json_ui:
+            ofile = mutant.parent / f"cbmc_output.{mutant.name}.{subset}{self.experiment}.json"
+        else:
+            ofile = mutant.parent / f"cbmc_output.{mutant.name}.{subset}{self.experiment}.txt"
+
         # one more than most loops are expected to execute, removes spurious failures
         # due to unwinding assertion failures
-        cmd = ["cbmc", "--unwind", str(65), "--unwinding-assertions", "--z3", "--json-ui", "--trace", "-I", str(self.wp.csemantics.parent)]
+        cmd = ["cbmc", "--unwind", str(65), "--unwinding-assertions", "--z3"]
+
+        if self.json_ui:
+            cmd.append("--json-ui")
+
+        cmd.extend(["--trace", "-I", str(self.wp.csemantics.parent)])
+
         cmd.extend(xinc)
         cmd.append(str(mutant))
         h = os.open(ofile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=0o666)
