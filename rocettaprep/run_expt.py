@@ -86,7 +86,7 @@ class Orchestrator:
 
         run_and_log(cmd, logfile)
 
-    def run_eqvcheck(self, run_all = False):
+    def run_eqvcheck(self, run_all = False, no_json = False):
         self._begin(f"eqvcheck")
         cmd = [str(MYPATH / RUN_EQVCHECK),
                '--timeout', str(self.timeout_s),
@@ -101,6 +101,9 @@ class Orchestrator:
         if self.serial:
             cmd.append('--np')
             note.append('.serial')
+
+        if no_json:
+            cmd.append('--no-json')
 
         note = ''.join(note)
         cmd.extend([self.workdir, self.experiment])
