@@ -51,7 +51,7 @@ def finish_eqv_check(workdir, all_mutants, experiment, programs = [], inputs = [
         json.dump(dict(out), fp=f)
 
 @join_app
-def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel = True, timeout_s = 90, json_ui = True):
+def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel = True, timeout_s = 90, json_ui = True, auto_no_json = False):
     import json
     from roctest import InsnTest
 
@@ -60,6 +60,10 @@ def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel
     workdir = wp.workdir / insn.working_dir
 
     mutants = muthelper.get_mutants(insn)
+
+    # Disable JSON output for things we know break with JSON output
+    if json_ui and auto_no_json and insn.insn.startswith('setp_q'):
+        json_ui = False
 
     executor = CBMCExecutor(wp, experiment, 'all' if all_mutants else '', timeout_s = timeout_s, json_ui = json_ui)
 
@@ -96,6 +100,7 @@ if __name__ == "__main__":
     p.add_argument("--timeout", help="Timeout to use (seconds)",
                    type=int, default=90)
     p.add_argument("--no-json", help="Don't generate JSON (experimental)", action="store_true")
+    p.add_argument("--auto-no-json", help="Automatically don't generate JSON (experimental)", action="store_true")
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -111,7 +116,7 @@ if __name__ == "__main__":
         out = []
         for i in insns:
             insn = Insn(i)
-            out.append(run_eqv_check(wp, insn, args.experiment, muthelper, all_mutants = args.all, parallel = True, timeout_s = args.timeout, json_ui = not args.no_json))
+            out.append(run_eqv_check(wp, insn, args.experiment, muthelper, all_mutants = args.all, parallel = True, timeout_s = args.timeout, json_ui = not args.no_json, auto_no_json = args.auto_no_json))
 
         for i, o in zip(insns, out):
             print(i)

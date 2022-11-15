@@ -86,7 +86,7 @@ class Orchestrator:
 
         run_and_log(cmd, logfile)
 
-    def run_eqvcheck(self, run_all = False, no_json = False):
+    def run_eqvcheck(self, run_all = False, no_json = False, auto_no_json = False):
         self._begin(f"eqvcheck")
         cmd = [str(MYPATH / RUN_EQVCHECK),
                '--timeout', str(self.timeout_s),
@@ -104,6 +104,9 @@ class Orchestrator:
 
         if no_json:
             cmd.append('--no-json')
+
+        if auto_no_json:
+            cmd.append('--auto-no-json')
 
         note = ''.join(note)
         cmd.extend([self.workdir, self.experiment])
@@ -225,6 +228,8 @@ if __name__ == "__main__":
     p.add_argument("--skip-round2", help="Do not run round 2 mutation testing", action='store_true')
     p.add_argument("--skip-stats", help="Do not update stats", action='store_true')
     p.add_argument("--timeout", help="Timeout to use (seconds)", type=int, default=90)
+    p.add_argument("--no-json", help="Disable JSON output for eqvcheck", action="store_true")
+    p.add_argument("--auto-no-json", help="Selectively disable JSON output", action="store_true")
 
     args = p.parse_args()
 
@@ -254,7 +259,9 @@ if __name__ == "__main__":
     if not (args.skip_mutants or args.all):
         x.run_mutants()
 
-    if not args.skip_eqvcheck: x.run_eqvcheck(run_all = args.all)
+    if not args.skip_eqvcheck: x.run_eqvcheck(run_all = args.all,
+                                              no_json = args.no_json,
+                                              auto_no_json = args.auto_no_json)
 
     if not args.skip_fuzzers:
         x.run_build_fuzzer_binaries('simple', run_all = args.all)
@@ -263,6 +270,7 @@ if __name__ == "__main__":
         x.run_fuzzer('simple', run_all = args.all)
         x.run_fuzzer('custom', run_all = args.all)
 
+    # gather_witnesses will automatically pick up .json/.text
     if not args.skip_eqvcheck: x.run_gather_witnesses(run_all = args.all)
     if not args.skip_fuzzers:
         x.run_collect_fuzzer('simple', run_all = args.all)
