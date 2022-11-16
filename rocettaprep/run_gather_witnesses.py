@@ -106,7 +106,8 @@ class CBMCOutput:
                 value = e[eq+1:]
                 if var.startswith('arg') or var.startswith('ret_'):
                     if not e.endswith('(assignment removed)'):
-                        assignments.append({'lhs': var, 'value_text': value})
+                        if not value.startswith('{'): # structure init; skip
+                            assignments.append({'lhs': var, 'value_text': value})
 
         return assignments
 
@@ -167,7 +168,12 @@ class CBMCOutput:
         inputs = []
         output = []
         for i in range(ninputs):
-            inputs.append(self._fmt_value(var_values[f"arg{i}"][-1])) # always pick the last assignment
+            if f"arg{i}" in var_values:
+                inputs.append(self._fmt_value(var_values[f"arg{i}"][-1])) # always pick the last assignment
+            elif f"arg{i}.cf" in var_values:
+                inputs.append(self._fmt_value(var_values[f"arg{i}.cf"][-1])) # always pick the last assignment
+            else:
+                raise KeyError(f"arg{i}")
 
         if 'ret_orig' in var_values:
             output.append(self._fmt_value(var_values[f"ret_orig"][-1]))
