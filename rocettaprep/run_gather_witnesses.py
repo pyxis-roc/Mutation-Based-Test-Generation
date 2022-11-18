@@ -20,6 +20,7 @@ import struct
 import sys
 import time
 import inputgen
+from insninfo import insn_info
 
 # stolen from smt2utils
 def conform_c(x):
@@ -104,7 +105,8 @@ class CBMCOutput:
                 eq = e.index('=')
                 var = e[:eq]
                 value = e[eq+1:]
-                if var.startswith('arg') or var.startswith('ret_'):
+                # out is used for out-only arguments
+                if var.startswith('arg') or var.startswith('ret_') or var.startswith('out'):
                     if not e.endswith('(assignment removed)'):
                         if not value.startswith('{'): # structure init; skip
                             assignments.append({'lhs': var, 'value_text': value})
@@ -163,26 +165,59 @@ class CBMCOutput:
             raise NotImplementedError(f"Don't know how to handle type {ty}")
 
     def gen_input_output_text(self, var_values):
-        ninputs = len(var_values) - len([x for x in var_values if x.startswith('ret_')])
+        ninputs = len(var_values) - len([x for x in var_values if x.startswith('ret_') or x.startswith('out')])
 
         inputs = []
         output = []
+        inouts = self.ii.get('inout_args', set())
         for i in range(ninputs):
+            if i in inouts:
+                ndx = -2
+            else:
+                ndx = -1
+
             if f"arg{i}" in var_values:
-                inputs.append(self._fmt_value(var_values[f"arg{i}"][-1])) # always pick the last assignment
+                inputs.append(self._fmt_value(var_values[f"arg{i}"][ndx])) # always pick the last assignment
             elif f"arg{i}.cf" in var_values:
-                inputs.append(self._fmt_value(var_values[f"arg{i}.cf"][-1])) # always pick the last assignment
+                inputs.append(self._fmt_value(var_values[f"arg{i}.cf"][ndx])) # always pick the last assignment
             else:
                 raise KeyError(f"arg{i}")
 
+        noutputs = (len(var_values) - ninputs) // 2 # get rid of ret_mut
+
+        outstart = 0
         if 'ret_orig' in var_values:
             output.append(self._fmt_value(var_values[f"ret_orig"][-1]))
-        else:
+            outstart += 1
+
+        if noutputs > 1:
             # multiple outputs
-            noutputs = (len(var_values) - ninputs) // 2 # get rid of ret_mut
-            assert noutputs > 1
-            for i in range(noutputs):
-                output.append(self._fmt_value(var_values[f"ret_orig.out{i}"][-1]))
+            ndx = 0
+            for i in range(noutputs-outstart):
+                k = f"ret_orig.out{ndx}"
+                if k in var_values:
+                    output.append(self._fmt_value(var_values[k][-1]))
+                    ndx += 1
+                elif f"out{ndx}" in var_values:
+                    output.append(self._fmt_value(var_values[f"out{ndx}"][-1]))
+                    ndx += 1
+                elif f"out{ndx}.cf" in var_values:
+                    output.append(self._fmt_value(var_values[f"out{ndx}.cf"][-1]))
+                    ndx += 1
+                else:
+                    raise KeyError(k)
+
+        if len(inouts):
+            for i in inouts:
+                ndx = -1
+                if f"arg{i}" in var_values:
+                    output.append(self._fmt_value(var_values[f"arg{i}"][ndx]))
+                elif f"arg{i}.cf" in var_values:
+                    output.append(self._fmt_value(var_values[f"arg{i}.cf"][ndx]))
+                else:
+                    raise KeyError(f"arg{i}")
+
+        assert len(output) > 0
 
         return inputs, output
 
@@ -231,6 +266,8 @@ class CBMCOutput:
             subset = '.all'
         else:
             subset = ''
+
+        self.ii = insn_info[insn.insn]
 
         ofile_json = mutant.parent / f"cbmc_output.{mutant.name}{subset}.{self.experiment}.json"
         ofile_txt = mutant.parent / f"cbmc_output.{mutant.name}{subset}.{self.experiment}.txt"
