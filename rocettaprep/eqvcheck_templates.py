@@ -221,6 +221,13 @@ class EqvCheckTemplate:
 
         return out
 
+    def get_abstract_args(self, ii):
+        aa =  ii.get('abstract_args', None)
+        if not aa: return []
+
+        assert self.insn.insn.startswith('lop3_'), self.insn.insn # other insns not yet supported
+        return [str(ii['abstract_args']['immLut'])] # added to the end
+
     def get_template(self):
         if self.fn_name == "main":
             fnr = "int"
@@ -251,6 +258,10 @@ class EqvCheckTemplate:
                 initargs.append(f"arg{i}")
 
             out.append(f"  {ty} {initargs[i]};")
+
+        aa = self.get_abstract_args(insn_info[self.insn.insn])
+        origargs.extend(aa)
+        mutargs.extend(aa)
 
         ret = ["ret_orig", "ret_mut"]
         rty = self.get_ret_type()

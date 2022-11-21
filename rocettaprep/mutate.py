@@ -17,6 +17,7 @@ from rocprepcommon import *
 from parsl.app.app import python_app
 import parsl
 import runcommon
+from insninfo import insn_info
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +197,7 @@ if __name__ == "__main__":
 
     out = []
     for insn in get_instructions(args.insn):
-        i = Insn(insn)
+        i = Insn(insn, insn_info[insn])
         out.append(run_mutator(mut, i))
 
     for x in out: x.result()

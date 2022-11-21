@@ -20,6 +20,7 @@ from rocprepcommon import *
 from parsl.app.app import python_app
 import parsl
 import sys
+from insninfo import insn_info
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,6 @@ class PTXSemantics:
 
     def create_single_insn_program(self, insn, sys_includes = [], user_includes = []):
         insn_fn = insn.insn_fn
-
         func_code = self.get_func_code(insn_fn)
 
         out = []
@@ -135,8 +135,9 @@ class PTXSemantics:
         return self.get_compile_command_primitive(insn.sem_file, insn.test_file, str(insn))
 
 class Insn:
-    def __init__(self, insn):
+    def __init__(self, insn, ii = None):
         self.insn = insn
+        self.ii = ii
 
     @property
     def working_dir(self):
@@ -152,7 +153,10 @@ class Insn:
 
     @property
     def insn_fn(self):
-        return f'execute_{self.insn}'
+        if self.ii is not None and 'base_instruction' in self.ii:
+            return f"execute_{self.ii['base_instruction']}"
+        else:
+            return f'execute_{self.insn}'
 
     @property
     def start_marker(self):
@@ -202,7 +206,7 @@ class Insn:
 
 @python_app
 def gen_insn_oracle(insn, oroot, p):
-    insn = Insn(insn)
+    insn = Insn(insn, insn_info[insn])
 
     odir = oroot / insn.working_dir
     if not odir.exists():

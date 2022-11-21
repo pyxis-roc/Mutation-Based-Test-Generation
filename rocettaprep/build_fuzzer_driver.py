@@ -11,6 +11,7 @@ from parsl.app.app import python_app, join_app, bash_app
 import parsl
 import sys
 import struct
+from insninfo import insn_info
 
 class FuzzerTemplateSimple:
     """Fuzzer template for simple scheme where we rely on the fuzzer to do
@@ -387,7 +388,7 @@ if __name__ == "__main__":
     p = []
     for insn in get_instructions(args.insn):
         print(insn, file=sys.stderr)
-        i = Insn(insn)
+        i = Insn(insn, insn_info[insn])
         if args.no_parallel:
             build_fuzzer_driver(wp, i, muthelper, setup_only = args.driver_only, fuzzer = args.fuzzer, parallel = not args.no_parallel)
         else:
