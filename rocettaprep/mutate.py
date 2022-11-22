@@ -18,6 +18,9 @@ from parsl.app.app import python_app
 import parsl
 import runcommon
 from insninfo import insn_info
+from collections import namedtuple
+
+MutCoord = namedtuple('MutCoord', 'filename start_line start_col end_line end_col')
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +132,62 @@ class MUSICHelper:
 
     def __init__(self, wp):
         self.wp = wp
+
+    def get_source_coord(self, mutinfo, before = True):
+        line_offset = 0
+
+        if before:
+            pfx = 'before:'
+        else:
+            pfx = 'after:'
+            # if kill is used, then line_offset = 3
+            if "kill" in mutinfo['Mutated Token']:
+                line_offset = 3
+
+        return MutCoord(filename = mutinfo['Mutant Filename'],
+                        start_line = int(mutinfo[f'{pfx}Start Line#'])+line_offset,
+                        start_col = int(mutinfo[f'{pfx}Start Col#']),
+                        end_line = int(mutinfo[f'{pfx}End Line#'])+line_offset,
+                        end_col = int(mutinfo[f'{pfx}End Col#']),
+                        )
+
+    def get_mutation_information(self, insn):
+        odir = self.wp.workdir / insn.working_dir / self.srcdir
+
+        n = Path(insn.sem_file).stem + '_mut_db.csv'
+        with open((odir / n), "r") as f:
+
+            f.readline() # skip first line, seems to contain a header
+                         # that we're not interested in
+
+            d = csv.reader(f)
+            headers = None
+            out = []
+            for row in d:
+                if headers is None:
+                    headers = row
+                    for k in range(2,2+4):
+                        headers[k] = "before:" + headers[k]
+
+                    for k in range(7,7+4):
+                        headers[k] = "after:" + headers[k]
+
+                    continue
+
+                rd = dict([(k, None) for k in headers])
+                rd.update(dict(zip(headers, row)))
+                if len(row) > len(headers):
+                    rd[None] = row[len(headers):]
+
+                if None in rd:
+                    assert len(rd[None]) == 1, rd[None]
+                    rd['_function'] = rd[None][0]
+
+                out.append((rd['Mutant Filename'], rd))
+
+            dout = dict(out)
+            assert len(dout) == len(out) # duplicates!
+            return dout
 
     def get_mutants(self, insn):
         workdir = self.wp.workdir / insn.working_dir
