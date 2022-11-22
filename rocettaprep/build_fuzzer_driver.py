@@ -89,6 +89,13 @@ class FuzzerTemplateSimple:
 
         return out
 
+    def get_abstract_args(self, ii):
+        aa = ii.get('abstract_args', None)
+        if not aa: return []
+
+        assert self.insn.insn.startswith('lop3_'), self.insn.insn # other insns not yet supported
+        return [str(ii['abstract_args']['immLut'])] # added to the end
+
     def get_template(self):
         out = []
         out.append("#ifdef __cplusplus")
@@ -153,6 +160,10 @@ class FuzzerTemplateSimple:
             else:
                 raise NotImplementedError(f"{oty} not yet handled")
 
+
+        aa = self.get_abstract_args(insn_info[self.insn.insn])
+        callargs.extend(aa)
+        mutargs.extend(aa)
 
         assert len(ret) == 2, ret
         origcall_args = ", ".join(callargs)
