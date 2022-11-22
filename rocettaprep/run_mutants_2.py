@@ -20,6 +20,7 @@ import parsl
 import runcommon
 
 import time
+import sys
 
 def run_single_test(wp, insn, test_info):
     def compare(wp, insn, test_info):
@@ -163,6 +164,10 @@ if __name__ == "__main__":
 
     if args.all and not args.round2:
         print("ERROR: --round2 must be specified for --all, for internal reasons")
+        sys.exit(1)
+
+    if args.r2source and not args.round2:
+        print("ERROR: --round2 must be specified when --r2source is specified")
         sys.exit(1)
 
     parsl.load(htconfig)
