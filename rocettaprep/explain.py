@@ -15,6 +15,7 @@ import subprocess
 import re
 import gzip
 import sys
+import csv
 
 def get_compile_output(insn_result, mutant):
     if mutant in insn_result.compiler_output:
@@ -152,33 +153,38 @@ def explain_mutant(insn_result, mutant):
                      ir.mut,
                      ir.insn, mutant,
                      ir.mutinfo)
-    print(m['original'])
-    print(m['mutated'])
 
     binary = ir.wp.workdir / ir.insn.working_dir / ir.mut.srcdir / target
-
-    if not binary.exists():
-        print(f'{binary} does not exist')
-    else:
-        print(f'{binary} exists')
-        # any warnings from compilation? # recompile with flags?
+    m['binary'] = binary
+    m['binary_exists'] = binary.exists()
 
     compile_ok, output = get_compile_output(ir, mutant)
     m['compile_ok'] = compile_ok
     m['compiler_output'] = output
-    m['compiler_analysis'] = []
-
-    if not compile_ok:
-        m['compiler_analysis'] = list(analyze_compiler(output, mutant))
-
-    print(m['compiler_analysis'])
+    m['compiler_analysis'] = "+".join(list(analyze_compiler(output, mutant)))
 
     m['eqvcheck'] = analyze_eqvcheck(insn_result, mutant)
-    print(m['eqvcheck'])
 
-    m['survivors'] = analyze_mutant_rounds(insn_result, mutant)
-    print(m['survivors'])
-    # TODO: handle all_subset correctly
+    m.update(analyze_mutant_rounds(insn_result, mutant))
+
+    return m
+
+def print_explanation(e):
+    if not e['binary_exists']:
+        print(f"{e['binary']} does not exist")
+    else:
+        print(f'{e["binary"]} exists')
+        # any warnings from compilation? # recompile with flags?
+
+    print(e["original"])
+    print(e["mutated"])
+
+    if not e['compile_ok']:
+        print(e['compiler_output'])
+        print(e['compiler_analysis'])
+
+    print(e['eqvcheck'])
+    print(f"round1={e['surv1']=} r2.eqvcheck={e['surv2.eqvcheck']} r2.fuzzer_simple={e['surv2.fuzzer_simple']} r2.fuzzer_custom={e['surv2.fuzzer_custom']}")
 
 def get_survivors(wp, mut, insn, experiment, all_subset = False):
     # load all survivors if possible
@@ -290,6 +296,8 @@ if __name__ == "__main__":
     p.add_argument("--all", help="Use the all subset data", action="store_true")
     p.add_argument("experiment", help="Experiment")
     p.add_argument("mutant", help="Mutant source file, or @all for all")
+    p.add_argument("-o", dest="output", help="Output CSV")
+    p.add_argument("-q", dest="quiet", help="Don't show output", action="store_true")
 
     args = p.parse_args()
     wp = WorkParams.load_from(args.workdir)
@@ -302,7 +310,18 @@ if __name__ == "__main__":
     else:
         mutants = [args.mutant]
 
+    out = []
     for m in mutants:
-        print(f"===> {m} <===")
-        explain_mutant(insn_results, m)
-        print("")
+        e = explain_mutant(insn_results, m)
+        out.append(e)
+        if not args.quiet:
+            print(f"===> {m} <===")
+            print_explanation(e)
+            print("")
+
+    if args.output and len(out):
+        with open(args.output, "w") as f:
+            d = csv.DictWriter(f, fieldnames = list(out[0].keys()))
+            d.writeheader()
+            d.writerows(out)
+        print(f"Wrote {args.output}", file=sys.stderr)
