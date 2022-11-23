@@ -24,7 +24,7 @@ def make_outputs(oracle, wp, insn, stderr=parsl.AUTO_LOGNAME, stdout=parsl.AUTO_
 @bash_app
 def make_mutants(wp, insn, mutant="music", stderr=parsl.AUTO_LOGNAME, stdout=parsl.AUTO_LOGNAME, label = None):
     x = os.cpu_count()
-    return f'make -C {wp.workdir / insn.working_dir / mutant} -j {x} -k'
+    return f'make -C {wp.workdir / insn.working_dir / mutant} -O -j {x} -k 2>&1 | tee | gzip > {wp.workdir / insn.working_dir / mutant / "make.output.gz"}'
 
 def get_ba_result(header, ba):
     try:
