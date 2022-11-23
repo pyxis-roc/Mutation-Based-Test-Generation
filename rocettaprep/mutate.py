@@ -105,11 +105,14 @@ class MUSICMutator:
             all_targets = " ".join([s[:-2] for s in srcs])
             f.write("CFLAGS ?= -g -O3\n\n")
             f.write(f"all: {all_targets}\n\n")
+            f.write(f".PHONY: clean\n\n")
+            f.write(f"clean:\n")
+            f.write(f"\trm -f {all_targets}\n\n") # will almost certainly exceed command line limits?
 
             for s in srcs:
                 target = s[:-2] # remove .c
-                srcs = [str(odir / s)]
-                f.write(f"{target}: {' '.join(srcs)}\n\t")
+                ss = [str(odir / s)]
+                f.write(f"{target}: {' '.join(ss)}\n\t")
                 cmds = p.get_compile_command_primitive(s, "../" + insn.test_file,
                                                        target, cflags=["${CFLAGS}",
                                                                        "-Wuninitialized"])
@@ -196,6 +199,27 @@ class MUSICHelper:
             mutants = json.load(fp=f)
 
         return mutants
+
+    def get_test_timings(self, insn, experiment, round2 = False, r2source = 'eqvcheck',
+                         all_subset = False):
+        workdir = self.wp.workdir / insn.working_dir
+
+        if round2:
+            if all_subset:
+                subset = 'all.'
+            else:
+                subset = ''
+
+            # from run_mutants_2.py
+
+            fname = workdir / f"mutant_timing.{subset}{experiment}.{r2source}.json"
+        else:
+            fname = workdir / f"mutant_timing.{experiment}.json"
+
+        with open(fname, "r") as f:
+            tests = json.load(fp=f)
+
+        return tests
 
     def get_survivors(self, insn, experiment, round2 = False, r2source = 'eqvcheck', all_subset = False):
         workdir = self.wp.workdir / insn.working_dir

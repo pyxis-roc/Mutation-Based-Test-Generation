@@ -9,8 +9,35 @@
 import argparse
 from rocprepcommon import *
 from build_mutations import get_mutation_helper, get_mutators
-from build_single_insn import Insn
+from build_single_insn import Insn, PTXSemantics
 import json
+import subprocess
+import re
+import gzip
+import sys
+
+def get_compile_output(insn_result, mutant):
+    if mutant in insn_result.compiler_output:
+        return None, "".join(insn_result.compiler_output[mutant])
+    else:
+        if insn_result.mutants_compiled == len(insn_result.mutants):
+            # usually indicates no interesting output
+            return None, ""
+        else:
+            print(f"WARNING: {mutant} compiler output not found, so recompiling", file=sys.stderr)
+            # usually the make output is incomplete, so for now, recompile
+            mutant = insn_result.mutants[mutant]['src']
+            target = "/tmp/test.o"
+
+            # note missing "../" +insn_result.insn.test_file
+            cmds = insn_result.ps.get_compile_command_primitive(mutant, "../" +insn_result.insn.test_file, target, cflags=["-g", "-O3", "-Wuninitialized"])
+            assert len(cmds) == 1
+
+            try:
+                output = subprocess.check_output(cmds[0], cwd=insn_result.wp.workdir / insn_result.insn.working_dir / insn_result.mut.srcdir, stderr=subprocess.STDOUT)
+                return True, output.decode('utf-8')
+            except subprocess.CalledProcessError as e:
+                return False, e.output.decode('utf-8')
 
 def _get_lines(filename, start, end):
     with open(filename, "r") as f:
@@ -56,6 +83,65 @@ def get_mutation(wp, mut, insn, mutant, mutinfo):
 
     return {'original': orig, 'mutated': mutated}
 
+def analyze_mutant_rounds(insn_result, mutant):
+    ir = insn_result
+    mutant = ir.mutants[mutant]['src']
+    target = ir.mutants[mutant]['target']
+
+    out = {}
+    mut_timings = ir.mutant_timing
+    surv = ir.surv
+
+    keys = [('surv1', 'mut1')]
+    keys.extend([(f'surv2.{f}', f'mut2.{f}') for f in ('eqvcheck', 'fuzzer_simple', 'fuzzer_custom')])
+
+    for sk, mtk in keys:
+        if mtk in mut_timings and mut_timings[mtk] is not None:
+            if sk in surv and surv[sk] is not None:
+                if target in mut_timings[mtk]:
+                    # mutant was run
+                    if mutant in surv[sk]:
+                        out[sk] = "SURVIVED"
+                    else:
+                        out[sk] = "KILLED"
+                else:
+                    assert mutant not in surv[sk], f"{mutant} was not run, but in survivors"
+                    out[sk] = "NOT RUN"
+            else:
+                out[sk] = "FAIL:MUTANT-TIMING-ONLY/NO-SURVIVOR-INFO"
+        else:
+            if sk in surv and surv[sk] is not None:
+                out[sk] = "FAIL:NO-MUTANT-TIMING-INFO/SURVIVOR-ONLY"
+            else:
+                out[sk] = "NOT AVAILABLE"
+
+    return out
+
+def analyze_eqvcheck(insn_result, mutant):
+    ir = insn_result
+
+    if mutant in ir.eqvcheck_timing:
+        if mutant in ir.not_equivalent:
+            return "NOT EQUIVALENT"
+        else:
+            return "EQUIVALENT" if ir.eqvcheck_timing[mutant]['retcode'] == 0 else "UNKNOWN"
+    else:
+        # missing eqvcheck_timing means it was never checked
+        # usually because it was killed in first round
+        return "NOT CHECKED"
+
+def analyze_compiler(compiler_output, mutant):
+    warnings_re = re.compile(f"^{mutant}:\\d+:\\d+: warning: .*$", re.MULTILINE)
+
+    out = set()
+    for w in re.finditer(warnings_re, compiler_output):
+        m = w.group(0)
+        if "[-Wuninitialized]" in m:
+            out.add("warning-uninitialized")
+        else:
+            out.add("warning-unknown")
+
+    return out
 
 def explain_mutant(insn_result, mutant):
     ir = insn_result
@@ -75,30 +161,24 @@ def explain_mutant(insn_result, mutant):
         print(f'{binary} does not exist')
     else:
         print(f'{binary} exists')
+        # any warnings from compilation? # recompile with flags?
 
-    # results of equivalence check?
-    if mutant not in ir.not_equivalent:
-        if mutant in ir.eqvcheck_timing:
-            m['eqvcheck'] = "EQUIVALENT" if eqvresult['retcode'] == 0 else "UNKNOWN"
-        else:
-            m['eqvcheck'] = "UNKNOWN"
-    else:
-        m['eqvcheck'] = "NOT EQUIVALENT"
+    compile_ok, output = get_compile_output(ir, mutant)
+    m['compile_ok'] = compile_ok
+    m['compiler_output'] = output
+    m['compiler_analysis'] = []
 
+    if not compile_ok:
+        m['compiler_analysis'] = list(analyze_compiler(output, mutant))
+
+    print(m['compiler_analysis'])
+
+    m['eqvcheck'] = analyze_eqvcheck(insn_result, mutant)
     print(m['eqvcheck'])
 
-    # any warnings from compilation? # recompile with flags?
-
-    # TODO: handle all_subset correctly
-    m['survivors'] = {}
-    for k in ['surv1', 'surv2.eqvcheck', 'surv2.fuzzer_simple', 'surv2.fuzzer_custom']:
-        if ir.surv[k] is None:
-            m['survivors'][k] = "NOT AVAILABLE"
-        else:
-            # KILLED in first round usually means never tested in other rounds unless --all is set.
-            m['survivors'][k] = "SURVIVED" if mutant in ir.surv[k] else "KILLED"
-
+    m['survivors'] = analyze_mutant_rounds(insn_result, mutant)
     print(m['survivors'])
+    # TODO: handle all_subset correctly
 
 def get_survivors(wp, mut, insn, experiment, all_subset = False):
     # load all survivors if possible
@@ -124,17 +204,19 @@ def get_survivors(wp, mut, insn, experiment, all_subset = False):
 class InsnResults:
     def __init__(self, wp, mut, insn, expt, all_subset = False):
         self.all_subset = all_subset
-        if self.all_subset: raise NotImplementedError
         self.wp = wp
         self.mut = mut
         self.insn = insn
         self.expt = expt
 
+        self.ps = PTXSemantics(wp.csemantics, []) # only for compiling
         self.mutants = self.load_mutants()
         self.mutinfo = self.mut.get_mutation_information(insn)
         self.surv = get_survivors(self.wp, self.mut, self.insn, self.expt, self.all_subset)
         self.not_equivalent = self.load_non_equivalent()
         self.eqvcheck_timing = self.load_eqvcheck_timing()
+        self.mutant_timing = self.load_mutant_timing()
+        self.compiler_output = self.load_compiler_output()
 
     def load_mutants(self):
         return dict([(x['src'], x) for x in self.mut.get_mutants(self.insn)])
@@ -155,6 +237,48 @@ class InsnResults:
 
         return timing
 
+    def load_compiler_output(self): # for mutants
+        mof = self.wp.workdir / self.insn.working_dir / self.mut.srcdir / "make.output.gz"
+        out = {}
+        ire = re.compile(r"^(.*\.c):\d+:\d+: (error|warning).*$")
+        targets = 0
+        if mof.exists():
+            with gzip.open(mof, "r") as f:
+                for l in f:
+                    ls = l.decode('utf-8')
+                    if ls.startswith('make: Entering directory'):
+                        targets += 1
+
+                    m = ire.match(ls)
+                    if m:
+                        src = m.group(1)
+                        if src not in out: out[src] = []
+                        out[src].append(m.group(0))
+
+        self.mutants_compiled = targets
+        return out
+
+    def load_mutant_timing(self):
+        out = {'mut1': None,
+               'mut2.eqvcheck': None,
+               'mut2.fuzzer_simple': None,
+               'mut22.fuzzer_custom': None}
+
+        try:
+            out['mut1'] = set(self.mut.get_test_timings(self.insn, self.expt,
+                                                        all_subset = self.all_subset))
+        except FileNotFoundError:
+            pass
+
+        for r2source in ['eqvcheck', 'fuzzer_simple', 'fuzzer_custom']:
+            try:
+                out[f'mut2.{r2source}'] = set(self.mut.get_test_timings(self.insn, self.expt,
+                                                                        round2 = True, r2source=r2source, all_subset = self.all_subset))
+            except FileNotFoundError:
+                pass
+
+        return out
+
 
 if __name__ == "__main__":
     from setup_workdir import WorkParams
@@ -163,13 +287,22 @@ if __name__ == "__main__":
     p.add_argument("workdir", help="Work directory")
     p.add_argument("--mutator", choices=get_mutators(), default="MUSIC")
     p.add_argument("--insn", help="Instruction to process (single instruction only!)")
+    p.add_argument("--all", help="Use the all subset data", action="store_true")
     p.add_argument("experiment", help="Experiment")
-    p.add_argument("mutant")
+    p.add_argument("mutant", help="Mutant source file, or @all for all")
 
     args = p.parse_args()
     wp = WorkParams.load_from(args.workdir)
     mut = get_mutation_helper(args.mutator, wp)
     insn = Insn(args.insn)
-    insn_results = InsnResults(wp, mut, insn, args.experiment, all_subset = False)
+    insn_results = InsnResults(wp, mut, insn, args.experiment, all_subset = args.all)
 
-    explain_mutant(insn_results, args.mutant)
+    if args.mutant == '@all':
+        mutants = insn_results.mutants
+    else:
+        mutants = [args.mutant]
+
+    for m in mutants:
+        print(f"===> {m} <===")
+        explain_mutant(insn_results, m)
+        print("")
