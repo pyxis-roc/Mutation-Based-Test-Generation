@@ -86,12 +86,23 @@ class PTXSemantics:
 
         generator = c_generator.CGenerator()
         func_code = generator.visit(self.funcdef_nodes[insn_fn])
-
         return func_code
+
+    def _patch_lop3(self, insn, func_code):
+        # we do this to get a more interesting mutation space
+        import lop3patches
+        immLut = insn.ii['abstract_args']['immLut']
+        patch = lop3patches.lop3_lut[immLut]
+        patch = patch.replace('c', 'src3').replace('b', 'src2').replace('a', 'src1')
+
+        return func_code.replace('logical_op3(src1, src2, src3, immLut);', patch + ';')
 
     def create_single_insn_program(self, insn, sys_includes = [], user_includes = []):
         insn_fn = insn.insn_fn
         func_code = self.get_func_code(insn_fn)
+
+        if insn.insn.startswith('lop3_'):
+            func_code = self._patch_lop3(insn, func_code)
 
         out = []
         out.extend([f'#include <{x}>' for x in sys_includes])
