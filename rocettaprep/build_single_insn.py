@@ -164,7 +164,7 @@ class Insn:
 
     @property
     def insn_fn(self):
-        if self.ii is not None and 'base_instruction' in self.ii:
+        if self.ii is not None and self.ii.get('base_instruction', None):
             return f"execute_{self.ii['base_instruction']}"
         else:
             return f'execute_{self.insn}'
