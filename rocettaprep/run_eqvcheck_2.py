@@ -50,6 +50,16 @@ def finish_eqv_check(workdir, all_mutants, experiment, programs = [], inputs = [
     with open(timfile, "w") as f:
         json.dump(dict(out), fp=f)
 
+def insn_with_json_failure(insn):
+    prefixes = ['setp_q', 'subc', 'addc', 'madc']
+    for p in prefixes:
+        if insn.insn.startswith(p): return True
+
+    if '_cc_' in insn.insn:
+        return True
+
+    return False
+
 @join_app
 def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel = True, timeout_s = 90, json_ui = True, auto_no_json = False):
     import json
@@ -62,7 +72,7 @@ def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel
     mutants = muthelper.get_mutants(insn)
 
     # Disable JSON output for things we know break with JSON output
-    if json_ui and auto_no_json and insn.insn.startswith('setp_q'):
+    if json_ui and auto_no_json and insn_with_json_failure(insn):
         json_ui = False
 
     executor = CBMCExecutor(wp, experiment, 'all' if all_mutants else '', timeout_s = timeout_s, json_ui = json_ui)
