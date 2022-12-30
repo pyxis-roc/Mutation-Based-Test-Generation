@@ -213,6 +213,16 @@ class Orchestrator:
         logfile = self.logdir / f'stats_timing.log'
         run_and_log(cmd, logfile)
 
+    def check_oracles(self):
+        self._begin(f"check_oracles")
+        cmd = [str(MYPATH / 'run_oracle.py'),
+               '--insn', self.insn,
+               '-q',
+               self.workdir, self.experiment]
+
+        logfile = self.logdir / f'oracle_check.log'
+        run_and_log(cmd, logfile)
+
 if __name__ == "__main__":
     from setup_workdir import WorkParams
 
@@ -275,6 +285,9 @@ if __name__ == "__main__":
     if not args.skip_fuzzers:
         x.run_collect_fuzzer('simple', run_all = args.all)
         x.run_collect_fuzzer('custom', run_all = args.all)
+
+    if not (args.skip_eqvcheck and args.skip_fuzzers):
+        x.check_oracles()
 
     if not args.skip_round2:
         x.run_round2('eqvcheck', run_all = args.all)
