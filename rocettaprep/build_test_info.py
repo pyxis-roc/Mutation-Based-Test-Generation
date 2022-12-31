@@ -17,6 +17,17 @@ from build_single_insn import Insn
 def extract_insn_test_info(wp, insn_info, insn):
     od = wp.workdir / insn.working_dir
 
+    # strip legacy cc_reg = False
+    newtests = []
+    for t in insn_info['tests']:
+        if 'cc_reg' in t and not t['cc_reg']:
+            continue
+
+        newtests.append(t)
+
+    # modifies it in place
+    insn_info['tests'] = newtests
+
     # json is faster
     with open(od / "testcases.json", "w") as f:
         json.dump(insn_info, fp=f, indent='  ')

@@ -13,10 +13,12 @@ if False:
     RUN_MUTANTS = 'run_mutants.py'
     RUN_EQVCHECK = 'run_eqvcheck.py'
     RUN_FUZZER = 'run_fuzzer.py'
+    RUN_BUILD_FUZZER_BINARIES = 'build_fuzzer_binaries.py'
 else:
     RUN_MUTANTS = 'run_mutants_2.py'
     RUN_EQVCHECK = 'run_eqvcheck_2.py'
     RUN_FUZZER = 'run_fuzzer_2.py'
+    RUN_BUILD_FUZZER_BINARIES = 'build_fuzzer_binaries.py'
 
 def run_and_log(cmd, logfile):
     with open(logfile, "w") as f:
@@ -84,7 +86,7 @@ class Orchestrator:
 
         run_and_log(cmd, logfile)
 
-    def run_eqvcheck(self, run_all = False):
+    def run_eqvcheck(self, run_all = False, no_json = False, auto_no_json = False):
         self._begin(f"eqvcheck")
         cmd = [str(MYPATH / RUN_EQVCHECK),
                '--timeout', str(self.timeout_s),
@@ -100,10 +102,32 @@ class Orchestrator:
             cmd.append('--np')
             note.append('.serial')
 
+        if no_json:
+            cmd.append('--no-json')
+
+        if auto_no_json:
+            cmd.append('--auto-no-json')
+
         note = ''.join(note)
         cmd.extend([self.workdir, self.experiment])
         logfile = self.logdir / f'eqvcheck{note}.log'
 
+        run_and_log(cmd, logfile)
+
+    def run_build_fuzzer_binaries(self, fuzzer, run_all = False):
+        self._begin(f"build_fuzzer_binaries {fuzzer}")
+        cmd = [str(MYPATH / RUN_BUILD_FUZZER_BINARIES),
+               '--insn', self.insn,
+               '--mutator', self.mutator,
+               '--fuzzer', fuzzer,
+               self.workdir, self.experiment]
+
+        note = ""
+        if run_all:
+            cmd.append("--all")
+            note = ".all"
+
+        logfile = self.logdir / f'build_fuzzer_binaries{note}.{fuzzer}.log'
         run_and_log(cmd, logfile)
 
     def run_gather_witnesses(self, run_all = False):
@@ -189,6 +213,16 @@ class Orchestrator:
         logfile = self.logdir / f'stats_timing.log'
         run_and_log(cmd, logfile)
 
+    def check_oracles(self):
+        self._begin(f"check_oracles")
+        cmd = [str(MYPATH / 'run_oracle.py'),
+               '--insn', self.insn,
+               '-q',
+               self.workdir, self.experiment]
+
+        logfile = self.logdir / f'oracle_check.log'
+        run_and_log(cmd, logfile)
+
 if __name__ == "__main__":
     from setup_workdir import WorkParams
 
@@ -204,6 +238,8 @@ if __name__ == "__main__":
     p.add_argument("--skip-round2", help="Do not run round 2 mutation testing", action='store_true')
     p.add_argument("--skip-stats", help="Do not update stats", action='store_true')
     p.add_argument("--timeout", help="Timeout to use (seconds)", type=int, default=90)
+    p.add_argument("--no-json", help="Disable JSON output for eqvcheck", action="store_true")
+    p.add_argument("--auto-no-json", help="Selectively disable JSON output", action="store_true")
 
     args = p.parse_args()
 
@@ -233,16 +269,25 @@ if __name__ == "__main__":
     if not (args.skip_mutants or args.all):
         x.run_mutants()
 
-    if not args.skip_eqvcheck: x.run_eqvcheck(run_all = args.all)
+    if not args.skip_eqvcheck: x.run_eqvcheck(run_all = args.all,
+                                              no_json = args.no_json,
+                                              auto_no_json = args.auto_no_json)
 
     if not args.skip_fuzzers:
+        x.run_build_fuzzer_binaries('simple', run_all = args.all)
+        x.run_build_fuzzer_binaries('custom', run_all = args.all)
+
         x.run_fuzzer('simple', run_all = args.all)
         x.run_fuzzer('custom', run_all = args.all)
 
+    # gather_witnesses will automatically pick up .json/.text
     if not args.skip_eqvcheck: x.run_gather_witnesses(run_all = args.all)
     if not args.skip_fuzzers:
         x.run_collect_fuzzer('simple', run_all = args.all)
         x.run_collect_fuzzer('custom', run_all = args.all)
+
+    if not (args.skip_eqvcheck and args.skip_fuzzers):
+        x.check_oracles()
 
     if not args.skip_round2:
         x.run_round2('eqvcheck', run_all = args.all)

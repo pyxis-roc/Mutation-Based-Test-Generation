@@ -19,6 +19,7 @@ from mutate import get_mutation_helper, get_mutators
 from parsl.app.app import python_app
 import parsl
 import sys
+from insninfo import insn_info
 
 class EqvCheckBuilder:
     def __init__(self, csemantics, rootdir, insn, include_dirs = None):
@@ -129,5 +130,5 @@ if __name__ == "__main__":
 
     for insn in get_instructions(args.insn):
         print(insn, file=sys.stderr)
-        i = Insn(insn)
+        i = Insn(insn, insn_info[insn])
         build_eqvcheck_driver(wp.csemantics, wp.workdir, muthelper, i, incl, args.driver_only, parallel=args.no_parallel)

@@ -50,8 +50,18 @@ def finish_eqv_check(workdir, all_mutants, experiment, programs = [], inputs = [
     with open(timfile, "w") as f:
         json.dump(dict(out), fp=f)
 
+def insn_with_json_failure(insn):
+    prefixes = ['setp_q', 'subc', 'addc', 'madc']
+    for p in prefixes:
+        if insn.insn.startswith(p): return True
+
+    if '_cc_' in insn.insn:
+        return True
+
+    return False
+
 @join_app
-def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel = True, timeout_s = 90):
+def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel = True, timeout_s = 90, json_ui = True, auto_no_json = False):
     import json
     from roctest import InsnTest
 
@@ -61,7 +71,11 @@ def run_eqv_check(wp, insn, experiment, muthelper, all_mutants = False, parallel
 
     mutants = muthelper.get_mutants(insn)
 
-    executor = CBMCExecutor(wp, experiment, 'all' if all_mutants else '', timeout_s = timeout_s)
+    # Disable JSON output for things we know break with JSON output
+    if json_ui and auto_no_json and insn_with_json_failure(insn):
+        json_ui = False
+
+    executor = CBMCExecutor(wp, experiment, 'all' if all_mutants else '', timeout_s = timeout_s, json_ui = json_ui)
 
     if all_mutants:
         run_on = [x['src'] for x in mutants]
@@ -95,6 +109,8 @@ if __name__ == "__main__":
     p.add_argument("--all", help="Run equivalence checks on all mutants, not just survivors", action="store_true")
     p.add_argument("--timeout", help="Timeout to use (seconds)",
                    type=int, default=90)
+    p.add_argument("--no-json", help="Don't generate JSON (experimental)", action="store_true")
+    p.add_argument("--auto-no-json", help="Automatically don't generate JSON (experimental)", action="store_true")
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -110,7 +126,7 @@ if __name__ == "__main__":
         out = []
         for i in insns:
             insn = Insn(i)
-            out.append(run_eqv_check(wp, insn, args.experiment, muthelper, all_mutants = args.all, parallel = True, timeout_s = args.timeout))
+            out.append(run_eqv_check(wp, insn, args.experiment, muthelper, all_mutants = args.all, parallel = True, timeout_s = args.timeout, json_ui = not args.no_json, auto_no_json = args.auto_no_json))
 
         for i, o in zip(insns, out):
             print(i)

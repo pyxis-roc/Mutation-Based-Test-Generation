@@ -25,17 +25,17 @@ def prep_insn_info(insnlist):
 
         del out[i]['name']
 
-        for should_be_unset in ['base_instruction', 'testprop_key',
-                                ]:
-            assert out[i][should_be_unset] is None, out[i]
+        # 'base_instruction',
+        for should_be_unset in ['testprop_key',]:
+            assert out[i][should_be_unset] is None, f"{should_be_unset} is set in {out[i][should_be_unset]}"
             del out[i][should_be_unset]
 
+        # 'abstract_args',
         for should_be_empty in ['postprocess', 'addrspace_in',
                                 'addrspace_out', 'argflags_in',
                                 'argflags_out', 'abstract_params',
-                                'abstract_args', 'perthread_in',
-                                'perthread_out']:
-            assert len(out[i][should_be_empty]) == 0, out[i]
+                                'perthread_in','perthread_out']:
+            assert len(out[i][should_be_empty]) == 0, f"{should_be_empty} is not empty in {out[i][should_be_empty]}"
             del out[i][should_be_empty]
 
     return out

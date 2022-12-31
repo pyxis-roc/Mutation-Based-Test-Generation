@@ -3,7 +3,7 @@
 import argparse
 from rocprepcommon import *
 from build_single_insn import Insn
-from eqvcheck_templates import insn_info, ty_helpers, ty_conv
+from eqvcheck_templates import insn_info, ty_helpers, ty_conv, StructRetvalTyHelper
 from mutate import get_mutation_helper, get_mutators
 import shutil
 from build_single_insn import PTXSemantics
@@ -11,6 +11,7 @@ from parsl.app.app import python_app, join_app, bash_app
 import parsl
 import sys
 import struct
+from insninfo import insn_info
 
 class FuzzerTemplateSimple:
     """Fuzzer template for simple scheme where we rely on the fuzzer to do
@@ -25,20 +26,75 @@ class FuzzerTemplateSimple:
 
     def get_ret_type(self):
         t = insn_info[self.insn.insn]['output_types']
-        assert len(t) == 1
+        if len(t) > 1:
+            if len(t) == 2 and t[1] == "pred":
+                self.output_types = list([ty_conv[tt] for tt in t])
+                return f"struct retval_{self.insn.insn}"
+
+            assert len(t) == 2 and t[1] == "cc_reg", t[1]
+
         return ty_conv[t[0]]
+
+    def get_output_types(self):
+        ty = insn_info[self.insn.insn]['output_types']
+        return [ty_conv[t] for t in ty]
 
     def get_ret_check(self, rv_orig, rv_mut):
         rty = self.get_ret_type()
 
         if rty in ty_helpers:
             return ty_helpers[rty].check_eqv(rv_orig, rv_mut)
+        elif rty.startswith('struct retval_'):
+            return StructRetvalTyHelper(rty, self.output_types).check_eqv(rv_orig, rv_mut)
         else:
             raise NotImplementedError(f"Checks for return type not implemented: {rty}")
 
     def get_param_types(self):
         t = insn_info[self.insn.insn]['arg_types']
         return [ty_conv[tt] for tt in t]
+
+    def get_inout_checks(self, orig_call_args, mut_call_args,
+                         template=lambda cond: f"  assert({cond});"):
+        inout = insn_info[self.insn.insn].get('inout_args', [])
+        ty = insn_info[self.insn.insn]['arg_types']
+
+        out = []
+        for idx in inout:
+            at = ty_conv[ty[idx]]
+            if at in ty_helpers:
+                # strip the & in front
+                tyh = ty_helpers[at]
+                out.append(template(tyh.check_eqv(orig_call_args[idx][1:], mut_call_args[idx][1:])))
+            else:
+                raise NotImplementedError(f"Checks for inout type not implemented: {at}")
+
+        return out
+
+    def get_out_checks(self, out_offset, orig_call_args, mut_call_args,
+                       template=lambda cond: f"  assert({cond});"):
+
+        oty = self.get_output_types()[1:]
+        out = []
+        for idx, ty in enumerate(oty, 1):
+            if ty == 'struct cc_register':
+                # strip the & in front
+                tyh = ty_helpers[ty]
+                out.append(template(tyh.check_eqv(orig_call_args[idx+out_offset-1][1:],
+                                                  mut_call_args[idx+out_offset-1][1:])))
+            elif ty == 'unsigned int':
+                # output is in a struct, so will be checked separately
+                pass
+            else:
+                raise NotImplementedError(f"Checks for out type not implemented: {ty}")
+
+        return out
+
+    def get_abstract_args(self, ii):
+        aa = ii.get('abstract_args', None)
+        if not aa: return []
+
+        assert self.insn.insn.startswith('lop3_'), self.insn.insn # other insns not yet supported
+        return [str(ii['abstract_args']['immLut'])] # added to the end
 
     def get_template(self):
         out = []
@@ -47,31 +103,42 @@ class FuzzerTemplateSimple:
         out.append("#endif")
         out.append(f'int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {{')
 
-        args = []
+        callargs = []
+        mutargs = []
+        mutinit = []
+        domchk = []
         sz = []
+
+        inout = set(insn_info[self.insn.insn].get('inout_args', set()))
 
         # use a struct to load args, with the possible caveat that any
         # packing might increase search space unnecessarily?
 
         out.append("  struct arg_struct {")
-
         for i, ty in enumerate(self.get_param_types()):
-            args.append(f"args->arg{i}")
-            sz.append(f"sizeof({ty})")
-            out.append(f"    {ty} arg{i};")
+            if i in inout:
+                callargs.append(f"&args->arg{i}")
+                mutargs.append(f"&mut_arg{i}")
+                mutinit.append(f"  {ty} mut_arg{i} = args->arg{i};")
+            else:
+                callargs.append(f"args->arg{i}")
+                mutargs.append(f"args->arg{i}")
 
+            cond = ty_helpers[ty].domain_restrict(f"args->arg{i}")
+            if cond is not None:
+                domchk.append(f"  if(!({cond})) return 0;")
+
+            out.append(f"    {ty} arg{i};")
         out.append("  } *args;")
 
-        szcheck = "+".join(sz)
         out.append("  if(Size != sizeof(struct arg_struct)) return 0;")
-
-        # packing check
-        # out.append(f"  assert(sizeof(struct arg_struct) == {szcheck});")
-        out.append("")
 
         # WARNING: ALIGNMENT ISSUES POSSIBLY?
         # this assumes machine has no alignment restrictions.
         out.append("  args = (struct arg_struct *) Data;")
+        out.extend(mutinit)
+
+        out.extend(domchk)
 
         ret = ["ret_orig", "ret_mut"]
         rty = self.get_ret_type()
@@ -80,14 +147,41 @@ class FuzzerTemplateSimple:
 
         out.append("")
 
+        # multiple output types are usually tacked on to the end?
+        # first output type is ret
+        out_offset = len(callargs)
+        for i, oty in enumerate(self.get_output_types()[1:], 0):
+            if oty == 'struct cc_register':
+                out.append(f'  {oty} out{i}, mut_out{i};')
+                callargs.append(f"&out{i}")
+                mutargs.append(f"&mut_out{i}")
+            elif oty == 'unsigned int': # pred x pred
+                assert rty.startswith('struct retval_'), rty
+            else:
+                raise NotImplementedError(f"{oty} not yet handled")
+
+
+        aa = self.get_abstract_args(insn_info[self.insn.insn])
+        callargs.extend(aa)
+        mutargs.extend(aa)
+
         assert len(ret) == 2, ret
-        call_args = ", ".join(args)
-        out.append(f"  {ret[0]} = {self.insn.insn_fn}({call_args});")
-        out.append(f"  {ret[1]} = {self.mutated_fn}({call_args});")
+        origcall_args = ", ".join(callargs)
+        mutcall_args =  ", ".join(mutargs)
+
+        out.append(f"  {ret[0]} = {self.insn.insn_fn}({origcall_args});")
+        out.append(f"  {ret[1]} = {self.mutated_fn}({mutcall_args});")
 
         out.append(f"  assert({self.get_ret_check(ret[0], ret[1])});")
 
-        out.append("return 0;")
+        # inout checks
+
+        if len(inout):
+            out.extend(self.get_inout_checks(callargs, mutargs))
+
+        out.extend(self.get_out_checks(out_offset, callargs, mutargs))
+
+        out.append("  return 0;")
         out.append("}")
 
         return "\n".join(out)
@@ -134,6 +228,8 @@ class FuzzerTemplateCustom(FuzzerTemplateSimple):
         for arg, ty in zip(args, self.get_param_types()):
             if ty == 'unsigned int':
                 ty = 'uint32_t'
+            elif ty == 'struct cc_register':
+                ty = 'cc_register'
 
             out.append(f"  {arg} = sample_{ty}();")
 
@@ -303,7 +399,7 @@ if __name__ == "__main__":
     p = []
     for insn in get_instructions(args.insn):
         print(insn, file=sys.stderr)
-        i = Insn(insn)
+        i = Insn(insn, insn_info[insn])
         if args.no_parallel:
             build_fuzzer_driver(wp, i, muthelper, setup_only = args.driver_only, fuzzer = args.fuzzer, parallel = not args.no_parallel)
         else:

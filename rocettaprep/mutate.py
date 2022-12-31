@@ -17,6 +17,10 @@ from rocprepcommon import *
 from parsl.app.app import python_app
 import parsl
 import runcommon
+from insninfo import insn_info
+from collections import namedtuple
+
+MutCoord = namedtuple('MutCoord', 'filename start_line start_col end_line end_col')
 
 logger = logging.getLogger(__name__)
 
@@ -101,11 +105,14 @@ class MUSICMutator:
             all_targets = " ".join([s[:-2] for s in srcs])
             f.write("CFLAGS ?= -g -O3\n\n")
             f.write(f"all: {all_targets}\n\n")
+            f.write(f".PHONY: clean\n\n")
+            f.write(f"clean:\n")
+            f.write(f"\trm -f {all_targets}\n\n") # will almost certainly exceed command line limits?
 
             for s in srcs:
                 target = s[:-2] # remove .c
-                srcs = [str(odir / s)]
-                f.write(f"{target}: {' '.join(srcs)}\n\t")
+                ss = [str(odir / s)]
+                f.write(f"{target}: {' '.join(ss)}\n\t")
                 cmds = p.get_compile_command_primitive(s, "../" + insn.test_file,
                                                        target, cflags=["${CFLAGS}",
                                                                        "-Wuninitialized"])
@@ -129,6 +136,62 @@ class MUSICHelper:
     def __init__(self, wp):
         self.wp = wp
 
+    def get_source_coord(self, mutinfo, before = True):
+        line_offset = 0
+
+        if before:
+            pfx = 'before:'
+        else:
+            pfx = 'after:'
+            # if kill is used, then line_offset = 3
+            if "kill" in mutinfo['Mutated Token']:
+                line_offset = 3
+
+        return MutCoord(filename = mutinfo['Mutant Filename'],
+                        start_line = int(mutinfo[f'{pfx}Start Line#'])+line_offset,
+                        start_col = int(mutinfo[f'{pfx}Start Col#']),
+                        end_line = int(mutinfo[f'{pfx}End Line#'])+line_offset,
+                        end_col = int(mutinfo[f'{pfx}End Col#']),
+                        )
+
+    def get_mutation_information(self, insn):
+        odir = self.wp.workdir / insn.working_dir / self.srcdir
+
+        n = Path(insn.sem_file).stem + '_mut_db.csv'
+        with open((odir / n), "r") as f:
+
+            f.readline() # skip first line, seems to contain a header
+                         # that we're not interested in
+
+            d = csv.reader(f)
+            headers = None
+            out = []
+            for row in d:
+                if headers is None:
+                    headers = row
+                    for k in range(2,2+4):
+                        headers[k] = "before:" + headers[k]
+
+                    for k in range(7,7+4):
+                        headers[k] = "after:" + headers[k]
+
+                    continue
+
+                rd = dict([(k, None) for k in headers])
+                rd.update(dict(zip(headers, row)))
+                if len(row) > len(headers):
+                    rd[None] = row[len(headers):]
+
+                if None in rd:
+                    assert len(rd[None]) == 1, rd[None]
+                    rd['_function'] = rd[None][0]
+
+                out.append((rd['Mutant Filename'], rd))
+
+            dout = dict(out)
+            assert len(dout) == len(out) # duplicates!
+            return dout
+
     def get_mutants(self, insn):
         workdir = self.wp.workdir / insn.working_dir
 
@@ -136,6 +199,27 @@ class MUSICHelper:
             mutants = json.load(fp=f)
 
         return mutants
+
+    def get_test_timings(self, insn, experiment, round2 = False, r2source = 'eqvcheck',
+                         all_subset = False):
+        workdir = self.wp.workdir / insn.working_dir
+
+        if round2:
+            if all_subset:
+                subset = 'all.'
+            else:
+                subset = ''
+
+            # from run_mutants_2.py
+
+            fname = workdir / f"mutant_timing.{subset}{experiment}.{r2source}.json"
+        else:
+            fname = workdir / f"mutant_timing.{experiment}.json"
+
+        with open(fname, "r") as f:
+            tests = json.load(fp=f)
+
+        return tests
 
     def get_survivors(self, insn, experiment, round2 = False, r2source = 'eqvcheck', all_subset = False):
         workdir = self.wp.workdir / insn.working_dir
@@ -196,7 +280,7 @@ if __name__ == "__main__":
 
     out = []
     for insn in get_instructions(args.insn):
-        i = Insn(insn)
+        i = Insn(insn, insn_info[insn])
         out.append(run_mutator(mut, i))
 
     for x in out: x.result()

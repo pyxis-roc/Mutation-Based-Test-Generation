@@ -110,6 +110,7 @@ if __name__ == "__main__":
     p.add_argument("workdir", help="Work directory")
     p.add_argument("experiment", help="Experiment name, must be suitable for embedding in filenames")
     p.add_argument("--insn", help="Instruction to process, '@FILE' form loads list from file instead")
+    p.add_argument("-q", dest="quiet", help="Quiet mode, report only killed oracles", action="store_true")
 
     args = p.parse_args()
     insns = get_instructions(args.insn)
@@ -128,11 +129,18 @@ if __name__ == "__main__":
             killed = run_tests(wp, insn, args.experiment)
             out.append((insn, killed))
 
+        ntotal = 0
+        nkilled = 0
         for _insn, _kf in out:
             _killed = _kf.result()
             res = "killed" if len(_killed) > 0 else "survived"
+            ntotal += 1
+            if args.quiet and res == "survived":
+                continue
+            nkilled += 1
             print(f"{_insn.insn}: Oracle {res}", file=sys.stderr)
             if len(_killed) > 0:
                 print(f"  {_insn.insn}", " ".join(_killed), file=sys.stderr)
 
+        print(f"{nkilled} killed out of {ntotal} oracles tested")
         pt.end_timer()
