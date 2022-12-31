@@ -1,6 +1,7 @@
-This is the artifact to accompany the our paper Pai and Shitrit,
-"Generating Test Suites for GPU Instruction Sets through Mutation and
-Equivalence Checking", submitted to ACM TOSEM.
+This is the artifact to accompany our paper:
+
+Pai and Shitrit, "Generating Test Suites for GPU Instruction Sets
+through Mutation and Equivalence Checking", submitted to ACM TOSEM.
 
 The code for this paper lives in
 [GitHub](https://github.com/pyxis-roc/Mutation-Based-Test-Generation)
@@ -37,8 +38,7 @@ If you decide not to use a container, unpack the artifact archive in
 location with around 50GB of free space (minimum, to run the --all
 experiments for input generation from scratch, you'll need around
 500GB). We'll refer to this location as `$ARTIFACT`. All commands
-below will be executed, unless otherwise noted, are executed from this
-location.
+below are, unless otherwise noted, executed from this location.
 
 After unpacking, you should see the following files:
 
@@ -61,7 +61,8 @@ Run `./Mutation-Based-Test-Generation/sys-prereqs.sh`. You should see this:
 *** GCC version
 gcc (Ubuntu 9.4.0-1ubuntu1~20.04.1) 9.4.0
 [...]
-Written by Padraig Brady.
+*** sudo version
+Sudo version 1.8.31
 ===> DONE <===
 
 ```
@@ -165,17 +166,14 @@ testing drivers, outputs, etc, run the following command. .
 ./Mutation-Based-Test-Generation/rocettaprep/build.sh ./Mutation-Based-Test-Generation/rocettaprep/smallset exptdata
 ```
 
-Note that you may see errors like this:
-
+You should see messages like this slowly scroll by:
 ```
-abs_f64 mutants: Failed with code 2
+subc_cc_s32: Success.
+sqrt_rm_f32: Success.
+sqrt_rn_f32: Success.
+abs_f32 mutants: Success.
+add_rm_ftz_sat_f32 mutants: Success.
 ```
-
-This is okay since not all mutants are semantically valid and the C
-compiler will not compile them. The standard output and errors of the
-compilation failures are available in the `runinfo/` directory created
-by Parsl for inspection and debugging if necessary. This step takes
-around 5 minutes or so.
 
 Correct execution of this command will produce in `exptdata`, a number
 of `working-directory-*` directories, one for each
@@ -191,7 +189,7 @@ as described in the paper, but on a smaller set of instructions. Note
 the "@" in `--insn`
 
 ```
-./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --insn @./Mutation-Based-Test-Generation/rocettaprep/smallset exptdata smallset-test
+./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --auto-no-json --insn @./Mutation-Based-Test-Generation/rocettaprep/smallset exptdata smallset-test
 ```
 
 This will run all the experiments for Table 2 and Table 3 and store
@@ -205,7 +203,7 @@ from scratch as described in the paper. Use the `--all` option and a
 different experiment name
 
 ```
-./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --insn abs_f32 exptdata test-scratch --all
+./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --auto-no-json --insn abs_f32 exptdata test-scratch --all
 ```
 
 This will run all the experiments for Table 4 (input generation from
@@ -240,9 +238,9 @@ Use the following commands to build and run the experiments for the
 full set of instructions. This usually takes around 50GB of space.
 
 ```
-./Mutation-Based-Test-Generation/rocettaprep/build.sh ./Mutation-Based-Test-Generation/rocettaprep/all_insns_except_cc exptdata
+./Mutation-Based-Test-Generation/rocettaprep/build.sh ./Mutation-Based-Test-Generation/rocettaprep/all_insns.list exptdata
 
-./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --insn @./Mutation-Based-Test-Generation/rocettaprep/all_insns_except_cc exptdata fullset
+./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --auto-no-json --insn @./Mutation-Based-Test-Generation/rocettaprep/all_insns.list exptdata fullset
 
 ```
 
@@ -254,7 +252,7 @@ If you decide to run the `--all` portion, make sure you have around
 concluded even after 2 days of running!).
 
 ```
-./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --insn @./Mutation-Based-Test-Generation/rocettaprep/all_insns_except_cc --all exptdata all-fullset
+./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --auto-no-json --insn @./Mutation-Based-Test-Generation/rocettaprep/all_insns.list --all exptdata all-fullset
 ```
 
 ## Re-doing Experiments
