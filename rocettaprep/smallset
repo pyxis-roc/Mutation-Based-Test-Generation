@@ -19,3 +19,14 @@ add_u32
 add_u64
 setp_eq_s32
 set_ge_and_invert_f32_f32
+addc_u32
+setp_q_eq_and_b16
+setp_q_equ_and_f32
+lop3_0x0_b32
+lop3_0x10_b32
+subc_s64
+madc_hi_s32
+mad_lo_cc_u64
+subc_cc_s32
+sqrt_rm_f32
+sqrt_rn_f32
