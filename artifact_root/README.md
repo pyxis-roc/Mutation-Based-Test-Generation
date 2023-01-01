@@ -35,7 +35,7 @@ Installation.
 ## Unpacking
 
 If you decide not to use a container, unpack the artifact archive in
-location with around 50GB of free space (minimum, to run the --all
+location with around 350GB of free space (minimum, to run the --all
 experiments for input generation from scratch, you'll need around
 1TB). We'll refer to this location as `$ARTIFACT`. All commands
 below are, unless otherwise noted, executed from this location.
@@ -245,7 +245,7 @@ full set of instructions. This usually takes around 50GB of space.
 ```
 
 Note the first step here can take around 8 hours, and the second step
-can take around 5 hours.
+can take around 7 hours.
 
 If you decide to run the `--all` portion, make sure you have around
 1TB of free disk space, and plenty of time (we have clocked it at
