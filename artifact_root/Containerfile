@@ -1,15 +1,10 @@
 # syntax=docker/dockerfile:1.4
 FROM ubuntu:20.04
-RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y git unzip sudo wget nano
-RUN apt-get install -y build-essential
-RUN apt-get install -y clang-7 clang-tools-7 libclang-common-7-dev libclang-7-dev libclang1-7 clang-format-7 python-clang-7 libllvm-7-ocaml-dev libllvm7 llvm-7 llvm-7-dev llvm-7-runtime libz-dev
-RUN apt-get install -y python3.8-venv
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git unzip sudo wget nano build-essential python3.8-venv clang-7 clang-tools-7 libclang-common-7-dev libclang-7-dev libclang1-7 clang-format-7 python-clang-7 libllvm-7-ocaml-dev libllvm7 llvm-7 llvm-7-dev llvm-7-runtime libz-dev
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 COPY llvm.list /etc/apt/sources.list.d/llvm.list
-RUN DEBIAN_FRONTEND=noninteractive apt-get update
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y clang-13
-RUN adduser test --gecos "Test User,,," --disabled-password
-RUN adduser test sudo
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y clang-13
+RUN adduser test --gecos "Test User,,," --disabled-password && adduser test sudo
 RUN wget "https://github.com/diffblue/cbmc/releases/download/cbmc-5.38.0/ubuntu-20.04-cbmc-5.38.0-Linux.deb" -O /tmp/ubuntu-20.04-cbmc-5.38.0-Linux.deb && dpkg -i /tmp/ubuntu-20.04-cbmc-5.38.0-Linux.deb
 USER test
 WORKDIR /home/test
@@ -17,5 +12,3 @@ RUN wget "https://github.com/Z3Prover/z3/releases/download/z3-4.8.16/z3-4.8.16-x
 COPY insn-testgen-artifact.tar.bz2 /home/test
 RUN tar jxf insn-testgen-artifact.tar.bz2
 USER root
-
-
