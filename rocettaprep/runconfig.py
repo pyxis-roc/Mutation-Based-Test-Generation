@@ -11,13 +11,17 @@ from parsl.executors import HighThroughputExecutor
 
 import os
 
-if os.cpu_count() is None:
+# set to true when developing
+wd = False
+cc = os.cpu_count()
+
+if cc is None:
     config = Config(executors=[ThreadPoolExecutor()])
 
     htconfig = Config(
         executors=[
             HighThroughputExecutor(
-                worker_debug=True,
+                worker_debug=wd,
                 cores_per_worker=1,
                 provider=LocalProvider(
                     channel=LocalChannel(),
@@ -29,17 +33,17 @@ if os.cpu_count() is None:
         strategy=None
         )
 else:
-    config = Config(executors=[ThreadPoolExecutor(max_threads=os.cpu_count())])
+    config = Config(executors=[ThreadPoolExecutor(max_threads=cc)])
 
     htconfig = Config(
         executors=[
             HighThroughputExecutor(
-                worker_debug=True,
+                worker_debug=wd,
                 cores_per_worker=1,
                 provider=LocalProvider(
                     channel=LocalChannel(),
                     init_blocks=1,
-                    max_blocks=os.cpu_count(),
+                    max_blocks=cc,
                 ),
             )
         ],

@@ -3,6 +3,7 @@
 import argparse
 import polars as pl
 from results_summary_pipeline import texify
+import sys
 
 def gen_table(data, output, cols = ["series", "min", "mean", "std", "max", "count"],
               coltitles = ["", "Min.", "Mean", "Std. Dev.", "Max.", "Count"]):
@@ -29,6 +30,7 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
+    print(f"Processing {args.eqvchkcsv}, {args.fscsv}, {args.fccsv}", file=sys.stderr)
     eqvchk = pl.read_csv(args.eqvchkcsv)
     fs = pl.read_csv(args.fscsv)
     fc = pl.read_csv(args.fccsv)
@@ -36,6 +38,7 @@ if __name__ == "__main__":
     out = pl.DataFrame()
     names = []
     for t, n in [(eqvchk, 'Equivalence Checker'), (fs, 'Fuzzer/Simple'), (fc, 'Fuzzer/Custom')]:
+        print(f"Processing {n} data", file=sys.stderr)
         d = t['time_ms_avg'].describe()
         names.append(n)
         out = out.vstack(d[['value']].transpose(include_header=True, column_names=d['statistic']))

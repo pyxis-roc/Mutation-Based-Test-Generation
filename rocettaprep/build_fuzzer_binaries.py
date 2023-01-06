@@ -37,7 +37,8 @@ def run_make(mutants, parallelism):
 
     t = set([m.name for m in mutants])
 
-    cmd = f"make -C {p.pop()} {' '.join(t)} -j {parallelism}"
+    # disable parallelism since outer make is parallel
+    cmd = f"make -C {p.pop()} {' '.join(t)}" # -j {parallelism}"
 
     return cmd
 
