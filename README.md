@@ -21,10 +21,10 @@ Sreepathi Pai, University of Rochester, https://cs.rochester.edu/~sree/
 
 # Requirements
 
-This artifact requires around 45GB of disk space for a full
+This artifact requires around 350GB of disk space for a full
 experiment.
 
-It compiles and runs a very large number of files (> 1M) and a
+It compiles and runs a very large number of files (> 6M) and a
 multicore processor is highly recommended.
 
 We used an AMD AMD EPYC 7502P 32-Core Processor on which full parallel
@@ -35,14 +35,15 @@ not a memory intensive workload.
 
 ## Time Requirements
 
-Here is a rough estimate of the time required for each stage:
+Running input generation from scratch (aka `--all`) on all
+instructions is the most expensive experiment in terms of space and
+time, taking around upwards of 3TB and maybe a week or more to run.
 
-  - Compilation: 8 hours
-  - Mutation Round #1: 1 hour
-  - Equivalence Checking (90s timeout): 1 hr 12 minutes
-  - Fuzzing (Simple, 90s timeout): 1hr 17 minutes
-  - Fuzzing (Custom, 90s timeout): 1hr 30 minutes
-  - All other stages: about a minute each
+Running input generation from scratch for the `tallset.list` set of
+instructions takes around 1.5TB and around 19--25 hours.
+
+Running the standard pipeline on all instructions takes around 350GB
+and around 17 hours.
 
 Note this system has only been tested running everything to
 completion. Although stages can be run individually, there is very
@@ -207,16 +208,22 @@ testing drivers, outputs, etc, run the following command.
 $REPODIR/rocettaprep/build.sh $REPODIR/rocettaprep/smallset $EXPTDIR
 ```
 
-Note that you may see errors like this:
+You should see messages like this slowly scroll by:
 
 ```
-abs_f64 mutants: Failed with code 2
+subc_cc_s32: Success.
+sqrt_rm_f32: Success.
+sqrt_rn_f32: Success.
+abs_f32 mutants: Success.
+add_rm_ftz_sat_f32 mutants: Success.
 ```
 
-This is okay since not all mutants are semantically valid and the C
-compiler will not compile them. The standard output and errors of the
-compilation failures are available in the `runinfo/` directory created
-by Parsl for inspection and debugging if necessary.
+Correct execution of this command will produce in `exptdata`, a number
+of `working-directory-*` directories, one for each
+instruction. Within each instruction-level directory, there will be
+directories for mutants (`music`), the equivalence checker drivers
+(`eqchk`), the fuzzer drivers (`libfuzzer_simple`, and
+`libfuzzer_custom`), and the known good outputs (`outputs`).
 
 ## Run the small set experiment, normal flow
 
@@ -224,7 +231,7 @@ Now, use the `run_expt.py` script to actually perform the experiment
 as described in the paper. Note the "@" in `--insn`
 
 ```
-$REPODIR/rocettaprep/run_expt.py --insn @$REPODIR/rocettaprep/smallset $EXPTDIR smallsettest
+$REPODIR/rocettaprep/run_expt.py --auto-no-json --insn @$REPODIR/rocettaprep/smallset $EXPTDIR smallsettest
 ```
 
 This will run all the experiments for Table 2 and Table 3 and store
@@ -238,7 +245,7 @@ from scratch as described in the paper. Use the `--all` option and a
 different experiment name
 
 ```
-$REPODIR/rocettaprep/run_expt.py --insn @$REPODIR/rocettaprep/smallset $EXPTDIR scratch --all
+$REPODIR/rocettaprep/run_expt.py --auto-no-json --insn @$REPODIR/rocettaprep/smallset $EXPTDIR scratch --all
 ```
 
 This will run all the experiments for Table 4 (input generation from
@@ -253,11 +260,11 @@ Use the following commands to build and run the experiments for the
 full set of instructions.
 
 ```
-$REPODIR/rocettaprep/build.sh $REPODIR/rocettaprep/all_insns_except_cc $EXPTDIR
+$REPODIR/rocettaprep/build.sh $REPODIR/rocettaprep/all_insns.list $EXPTDIR
 
-$REPODIR/rocettaprep/run_expt.py --insn @$REPODIR/rocettaprep/all_insns_except_cc $EXPTDIR fullset
+$REPODIR/rocettaprep/run_expt.py --auto-no-json --insn @$REPODIR/rocettaprep/all_insns.list $EXPTDIR fullset
 
-$REPODIR/rocettaprep/run_expt.py --insn @$REPODIR/rocettaprep/all_insns_except_cc --all $EXPTDIR allfullset
+$REPODIR/rocettaprep/run_expt.py --auto-no-json --insn @$REPODIR/rocettaprep/all_insns.list --all $EXPTDIR allfullset
 ```
 
 Note the first step here can take around 8 hours, and the other steps can take around 5 hours each.
