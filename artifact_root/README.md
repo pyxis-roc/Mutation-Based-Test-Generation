@@ -37,7 +37,7 @@ Installation.
 If you decide not to use a container, unpack the artifact archive in
 location with around 350GB of free space (minimum, to run the --all
 experiments for input generation from scratch, you'll need around
-1TB). We'll refer to this location as `$ARTIFACT`. All commands
+1.5TB). We'll refer to this location as `$ARTIFACT`. All commands
 below are, unless otherwise noted, executed from this location.
 
 After unpacking, you should see the following files:
@@ -120,9 +120,9 @@ All commands below now run in this virtual environment.
 ## Experimental Work Directory Setup
 
 With the virtual environment all setup, run the following command to
-setup a `exptdata` directory that will contain all the experimental data. This
-directory will grow to at least 45GB.  From within the virtual
-environment:
+setup a `exptdata` directory that will contain all the experimental
+data. This directory will grow to at least 350GB.  From within the
+virtual environment:
 
 ```
 ./Mutation-Based-Test-Generation/rocettaprep/setup_workdir.py --fake-includes pycparser-release_v2.21/utils/fake_libc_include/ ./ROCetta-ptx-semantics/v6.5/c/ptxc.c exptdata
@@ -248,15 +248,33 @@ Note the first step here can take around 8 hours, and the second step
 can take around 7 hours.
 
 If you decide to run the `--all` portion, make sure you have around
-1TB of free disk space, and plenty of time (we have clocked it at
+1.5TB of free disk space, and plenty of time (we have clocked it at
 around a week of runtime).
 
 ```
 ./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --auto-no-json --insn @./Mutation-Based-Test-Generation/rocettaprep/all_insns.list --all exptdata all-fullset
 ```
 
+## The `Data` Directory
+
+In the artifact root, the `Data` directory contains data from our
+experiments. This allows you to reproduce the figures and tables from
+our paper.
+
+```
+cd Data/
+
+../Mutation-Based-Test-Generation/rocettaprep/paper_results.sh . fullset
+
+../Mutation-Based-Test-Generation/rocettaprep/paper_results.sh . \
+   all-tallset --all
+```
+
+Read the RCR report for more details.
+
 ## Re-doing Experiments
 
 Deleting the artifact directory and unpacking it should let you redo
 everything from scratch.
+
 
