@@ -13,8 +13,9 @@ import os
 
 # set to true when developing
 wd = False
+cc = os.cpu_count()
 
-if os.cpu_count() is None:
+if cc is None:
     config = Config(executors=[ThreadPoolExecutor()])
 
     htconfig = Config(
@@ -32,7 +33,7 @@ if os.cpu_count() is None:
         strategy=None
         )
 else:
-    config = Config(executors=[ThreadPoolExecutor(max_threads=os.cpu_count())])
+    config = Config(executors=[ThreadPoolExecutor(max_threads=cc)])
 
     htconfig = Config(
         executors=[
@@ -42,7 +43,7 @@ else:
                 provider=LocalProvider(
                     channel=LocalChannel(),
                     init_blocks=1,
-                    max_blocks=os.cpu_count(),
+                    max_blocks=cc,
                 ),
             )
         ],
