@@ -222,7 +222,7 @@ To generate the tables used in the experiment, run the following commands:
 ./Mutation-Based-Test-Generation/rocettaprep/paper_results.sh exptdata smallset-test
 
 # for the all experiment
-./Mutation-Based-Test-Generation/rocettaprep/paper_results.sh exptdata test-scratch
+./Mutation-Based-Test-Generation/rocettaprep/paper_results.sh exptdata test-scratch --all
 ```
 
 This should result in a number of TeX files in the current directory
@@ -235,7 +235,7 @@ worked, everything is setup properly and you can now run the full set
 of experiments.
 
 Use the following commands to build and run the experiments for the
-full set of instructions. This usually takes around 50GB of space.
+full set of instructions. This usually takes around 350GB of space.
 
 ```
 ./Mutation-Based-Test-Generation/rocettaprep/build.sh ./Mutation-Based-Test-Generation/rocettaprep/all_insns.list exptdata
@@ -249,7 +249,7 @@ can take around 7 hours.
 
 If you decide to run the `--all` portion, make sure you have around
 1.5TB of free disk space, and plenty of time (we have clocked it at
-around a week of runtime).
+around a week of runtime, though we've never run it to completion).
 
 ```
 ./Mutation-Based-Test-Generation/rocettaprep/run_expt.py --auto-no-json --insn @./Mutation-Based-Test-Generation/rocettaprep/all_insns.list --all exptdata all-fullset
